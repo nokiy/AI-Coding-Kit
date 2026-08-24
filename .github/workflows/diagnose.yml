@@ -1,10 +1,11 @@
 # 🤖 CI failure diagnosis — central reusable triage gate (AI-Coding-Kit#1)
 # Called from each repo's ci-diagnose stub on `workflow_run` failure.
 # Tier policy (三档分诊):
-#   tier 1 · silent   — first failed attempt gets one free retry, no human noise
+#   tier 1 · silent   — handled upstream in quality.yml: flakes retry in-job and superseded
+#                       runs exit green, so neither ever becomes a failed run
 #   tier 2 · comment  — bot/infra illness or nothing blocked: comment, no @mention
 #   tier 3 · decision — blocks a merge / needs an A-B call / recurring: comment + @maintainer
-#     (the @mention is the only email channel — GitHub Actions emails are switched off)
+#     (the @mention is the email that carries a diagnosis, not just "run failed")
 name: Diagnose
 
 on:
@@ -19,25 +20,11 @@ on:
         required: true
 
 jobs:
-  rerun:
-    # Tier 1: a first failure is presumed transient — retry the failed jobs once, silently.
-    # The retried run fires workflow_run again with run_attempt=2, which routes to diagnose.
-    if: github.event.workflow_run.run_attempt == 1
-    # Caller's BOT_RUNNER (self-hosted, unmetered) — a cloud runner here dies the moment
-    # Actions billing is capped, which is precisely a condition this gate exists to handle.
-    runs-on: ${{ fromJSON(vars.BOT_RUNNER || '"ubuntu-latest"') }}
-    permissions:
-      actions: write
-    steps:
-      - env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run rerun ${{ github.event.workflow_run.id }} --failed -R ${{ github.repository }}
-
   diagnose:
-    # Attempt 2 exactly: the failure survived its free retry — pull logs, locate cause,
-    # pick a tier. Attempt 3+ (a human re-running by hand) stays silent: the human is
-    # already at the scene, and repeating the diagnosis would just spam the thread.
-    if: github.event.workflow_run.run_attempt == 2
+    # First attempt only: quality.yml already retried in-job, so this failure is real.
+    # Attempt 2+ (a human re-running by hand) stays silent — the human is already at the
+    # scene, and repeating the diagnosis would just spam the thread.
+    if: github.event.workflow_run.run_attempt == 1
     runs-on: ${{ fromJSON(vars.BOT_RUNNER || '"ubuntu-latest"') }}
     permissions:
       contents: write   # usage ledger (bot-usage branch, where the caller repo keeps one)
