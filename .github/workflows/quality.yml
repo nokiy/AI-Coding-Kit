@@ -15,6 +15,7 @@
 #     quality:
 #       uses: nokiy/AI-Coding-Kit/.github/workflows/quality.yml@main
 #       with:
+#         lint: ./lint.sh
 #         build: ./dev.sh build -c release
 #         test: ./test.sh
 #         runner: '"macos-15"'
@@ -23,6 +24,10 @@ name: Quality
 on:
   workflow_call:
     inputs:
+      lint:
+        description: "Lint command (empty = skip); receives CI_BASE_REF to lint only changed files"
+        type: string
+        default: ""
       build:
         description: "Build command (empty = skip)"
         type: string
@@ -56,6 +61,13 @@ jobs:
           fi
       - uses: actions/checkout@v4
         if: steps.tip.outputs.skip != 'true'
+      # Lint before build: cheapest check first. CI_BASE_REF lets the project's lint
+      # command diff against the PR target, so legacy code is never retro-flagged.
+      - name: Lint
+        if: steps.tip.outputs.skip != 'true' && inputs.lint != ''
+        env:
+          CI_BASE_REF: ${{ github.base_ref || github.ref_name }}
+        run: ${{ inputs.lint }}
       - name: Build
         if: steps.tip.outputs.skip != 'true' && inputs.build != ''
         run: ${{ inputs.build }}
