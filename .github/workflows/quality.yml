@@ -1,0 +1,52 @@
+# Reusable quality gate — the single source for CI check logic.
+# Project ci.yml files are 3-line stubs calling this; edit HERE, never in stubs.
+#
+# Dual-channel runner (quota-bar ticket #189 pattern): the caller repo's
+# CI_RUNNER variable overrides the default — a local scheduled task flips it
+# to self-hosted labels when hosted-runner quota runs low. The variable holds
+# JSON text (label arrays can only travel as text), hence fromJSON.
+#
+# Caller stub example (project .github/workflows/ci.yml):
+#   name: CI
+#   on:
+#     pull_request:
+#       branches: [dev, main]
+#   jobs:
+#     quality:
+#       uses: nokiy/AI-Coding-Kit/.github/workflows/quality.yml@main
+#       with:
+#         build: ./dev.sh build -c release
+#         test: ./test.sh
+#         runner: '"macos-15"'
+name: Quality
+
+on:
+  workflow_call:
+    inputs:
+      build:
+        description: "Build command (empty = skip)"
+        type: string
+        default: ""
+      test:
+        description: "Test command"
+        type: string
+        required: true
+      runner:
+        description: 'Default runner as JSON text, e.g. "macos-15" or "ubuntu-latest"'
+        type: string
+        default: '"ubuntu-latest"'
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ${{ fromJSON(vars.CI_RUNNER || inputs.runner) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        if: ${{ inputs.build != '' }}
+        run: ${{ inputs.build }}
+      - name: Test
+        run: ${{ inputs.test }}
