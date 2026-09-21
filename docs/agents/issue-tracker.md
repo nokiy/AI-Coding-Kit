@@ -30,8 +30,8 @@ Run `gh issue view <number> --comments`.
 Used by `loki-pm:triage` — before any sizing, search for an owner:
 
 - **Active tickets**: `gh issue list --state open`
-- **Specs**: `gh issue list --search "Feature Spec in:title"` — the new ticket references the
-  spec issue it hits.
+- **Specs**: `gh issue list --label spec --state all` — open or closed alike; the new ticket
+  references the spec issue it hits.
 - No hit on either → the item is unowned.
 
 ## Wayfinding operations
