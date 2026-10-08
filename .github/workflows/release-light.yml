@@ -1,0 +1,96 @@
+# Reusable light release bot: one version per repo, cut on demand. Shared by every light repo.
+# "Light" = main is always live; a version is just a tag + GitHub Release made when you say
+# so. Multi-package or release-PR repos keep Changesets / release-please instead.
+#
+# Next version = the highest vX.Y.Z tag with one part bumped (patch by default); no tag yet
+# gives v0.0.1. Nothing new since the last tag exits green without a release.
+#
+# Caller stub (project .github/workflows/release.yml); the caller job must grant contents: write:
+#   name: Release
+#   on:
+#     workflow_dispatch:
+#       inputs:
+#         bump:
+#           description: "patch | minor | major"
+#           type: choice
+#           options: [patch, minor, major]
+#           default: patch
+#         dry-run:
+#           description: "Print the next version, create nothing"
+#           type: boolean
+#           default: false
+#   permissions:
+#     contents: write
+#   jobs:
+#     release:
+#       uses: nokiy/AI-Coding-Kit/.github/workflows/release-light.yml@master
+#       with:
+#         bump: ${{ inputs.bump }}
+#         dry-run: ${{ inputs.dry-run }}
+# Cut one:  gh workflow run release.yml -R <owner>/<repo> -f bump=patch   (add -f dry-run=true to preview)
+name: Release (light)
+
+on:
+  workflow_call:
+    inputs:
+      bump:
+        description: "patch, minor or major"
+        type: string
+        default: patch
+      dry-run:
+        description: "Print the next version and create nothing"
+        type: boolean
+        default: false
+      tag-prefix:
+        description: "Tag prefix before X.Y.Z"
+        type: string
+        default: "v"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Next version
+        id: next
+        env:
+          BUMP: ${{ inputs.bump }}
+          PREFIX: ${{ inputs.tag-prefix }}
+        run: |
+          set -euo pipefail
+          case "$BUMP" in patch|minor|major) ;; *) echo "bump must be patch, minor or major"; exit 1 ;; esac
+          last=$(git tag --list "${PREFIX}[0-9]*.[0-9]*.[0-9]*" --sort=-v:refname | head -n1)
+          cur=${last#"$PREFIX"}; cur=${cur:-0.0.0}
+          IFS=. read -r ma mi pa <<<"$cur"
+          case "$BUMP" in major) ma=$((ma+1)); mi=0; pa=0 ;; minor) mi=$((mi+1)); pa=0 ;; *) pa=$((pa+1)) ;; esac
+          tag="${PREFIX}${ma}.${mi}.${pa}"
+          skip=false
+          if [ -n "$last" ] && [ "$(git rev-list --count "${last}..HEAD")" = 0 ]; then skip=true; fi
+          echo "last=${last:-none} next=${tag} skip=${skip}"
+          { echo "tag=${tag}"; echo "skip=${skip}"; } >> "$GITHUB_OUTPUT"
+
+      - name: Create release
+        if: steps.next.outputs.skip != 'true' && !inputs.dry-run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.next.outputs.tag }}
+        run: gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --generate-notes
+
+      - name: Summary
+        env:
+          TAG: ${{ steps.next.outputs.tag }}
+          SKIP: ${{ steps.next.outputs.skip }}
+          DRY: ${{ inputs.dry-run }}
+        run: |
+          if [ "$SKIP" = true ]; then echo "Nothing new since the last tag; no release made." >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$DRY" = true ]; then echo "Dry run: next version would be ${TAG}." >> "$GITHUB_STEP_SUMMARY"
+          else echo "Released ${TAG}." >> "$GITHUB_STEP_SUMMARY"; fi
