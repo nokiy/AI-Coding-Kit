@@ -6,6 +6,9 @@
 # to self-hosted labels when hosted-runner quota runs low. The variable holds
 # JSON text (label arrays can only travel as text), hence fromJSON.
 #
+# Every run also executes the File gate (protocols/file-gate.md) on the PR diff;
+# no input turns it off.
+#
 # Caller stub example (project .github/workflows/ci.yml):
 #   name: CI
 #   on:
@@ -71,6 +74,50 @@ jobs:
           fi
       - uses: actions/checkout@v4
         if: steps.tip.outputs.skip != 'true'
+      # File gate (protocols/file-gate.md): every file the PR touches, judged whole —
+      # 400 lines, 200 chars per line, no generic file names. Always on, no input skips it.
+      # The gate runs from the kit at this workflow's own commit, so a caller pinning
+      # @<branch> tests that branch. Empty job.workflow_* would make checkout fall back to
+      # the caller repo, so the guard step fails closed first.
+      - name: File gate — locate kit
+        if: steps.tip.outputs.skip != 'true'
+        env:
+          KIT_REPO: ${{ job.workflow_repository }}
+          KIT_SHA: ${{ job.workflow_sha }}
+        run: |
+          if [ -z "$KIT_REPO" ] || [ -z "$KIT_SHA" ]; then
+            echo "::error::job.workflow_repository / job.workflow_sha empty — cannot locate file-gate"
+            exit 1
+          fi
+          echo "file-gate from ${KIT_REPO}@${KIT_SHA}"
+      - uses: actions/checkout@v4
+        if: steps.tip.outputs.skip != 'true'
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .file-gate-kit
+      # checkout is depth 1: fetch the base and deepen until the merge-base resolves.
+      - name: File gate
+        if: steps.tip.outputs.skip != 'true'
+        env:
+          CI_BASE_REF: ${{ github.base_ref || github.ref_name }}
+        run: |
+          git fetch --no-tags --depth=50 origin "+refs/heads/${CI_BASE_REF}:refs/remotes/origin/${CI_BASE_REF}"
+          git fetch --no-tags --depth=50 origin "$(git rev-parse HEAD)" || true
+          for step in 1 2 3; do
+            git merge-base "origin/${CI_BASE_REF}" HEAD >/dev/null 2>&1 && break
+            git fetch --no-tags --deepen=200 origin "+refs/heads/${CI_BASE_REF}:refs/remotes/origin/${CI_BASE_REF}" "$(git rev-parse HEAD)" || true
+          done
+          if ! git merge-base "origin/${CI_BASE_REF}" HEAD >/dev/null 2>&1 \
+             && [ "$(git rev-parse --is-shallow-repository)" = true ]; then
+            git fetch --no-tags --unshallow origin
+          fi
+          echo "merge-base: $(git merge-base "origin/${CI_BASE_REF}" HEAD || echo none)"
+          # The kit copy is removed afterwards so later lint/build/test steps never see it.
+          code=0
+          .file-gate-kit/scripts/file-gate/file-gate.sh --base "origin/${CI_BASE_REF}" || code=$?
+          rm -rf .file-gate-kit
+          exit "$code"
       # Node preset: the same toolchain on hosted and self-hosted runners, whatever the
       # runner image ships. npm ci here keeps project stubs to plain script names.
       - uses: actions/setup-node@v4

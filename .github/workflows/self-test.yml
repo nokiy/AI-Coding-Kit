@@ -1,0 +1,14 @@
+# Kit self-test: every PR into master runs the reusable quality gate against this repo,
+# so the File gate step judges the PR's own files and test.sh proves file-gate.sh on Linux
+# (default runner ubuntu-latest).
+name: Self-test
+
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  quality:
+    uses: ./.github/workflows/quality.yml
+    with:
+      test: ./scripts/file-gate/test.sh

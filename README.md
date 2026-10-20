@@ -51,6 +51,12 @@ Inspired by "Gödel, Escher, Bach".
 curl -o CLAUDE.md https://raw.githubusercontent.com/JessyTsui/ai-coding-kit/main/protocols/fractal-docs.md
 ```
 
+### [File Gate Protocol](./protocols/file-gate.md)
+
+Every code file a commit or PR touches is judged whole: at most 400 lines, no line over 200 characters, no generic file names (`utils`, `helpers`, `types` …). A pre-commit hook judges the staged copy; the reusable CI workflow judges the PR diff and is final. Script: [`scripts/file-gate/`](./scripts/file-gate); naming linter presets: [`configs/`](./configs).
+
+提交或 PR 碰到的每个代码文件整份检查：不超过 400 行、单行不超过 200 字符、不用万金油文件名。pre-commit 钩子查暂存版本，CI 查 PR 改动并一锤定音。
+
 ---
 
 ## Usage / 使用

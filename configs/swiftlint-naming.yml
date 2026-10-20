@@ -1,0 +1,31 @@
+# SwiftLint naming + size preset — the per-language half of protocols/file-gate.md.
+# file-gate.sh judges file size, line length and file names; identifier names belong here.
+#
+# Adopt: copy this file to the project root as .swiftlint.yml (or merge its keys into the
+# existing one; a project with its own config can also list it under `parent_config:`), then
+# run `swiftlint lint --strict` from the project's lint command so CI's Lint step enforces it.
+# Every rule below is an error: a violation fails the lint, there is no warning tier.
+
+opt_in_rules:
+  - file_name
+
+identifier_name:
+  min_length:
+    error: 3
+  excluded: [id, i, j, k, x, y, w, h]
+
+file_length:
+  warning: 400
+  error: 400
+
+line_length:
+  warning: 200
+  error: 200
+
+custom_rules:
+  vague_identifier:
+    name: "Vague identifier"
+    regex: '\b(let|var|func)\s+(data|tmp|temp|obj|info|result|res|ret|val|foo|bar|item|list|str|arr|dict)\d*\b'
+    match_kinds: [keyword, identifier]
+    message: "名字说不出它装的是什么：换成领域名词，比如 usageRows、quotaReset"
+    severity: error

@@ -1,0 +1,8 @@
+{
+  "rules": {
+    "id-length": ["error", { "min": 3, "exceptions": ["id", "i", "j", "k", "x", "y", "w", "h"] }],
+    "id-denylist": ["error",
+      "data", "tmp", "temp", "obj", "info", "result", "res", "ret", "val",
+      "foo", "bar", "item", "list", "str", "arr", "dict"]
+  }
+}
