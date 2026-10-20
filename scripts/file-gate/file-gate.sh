@@ -102,7 +102,7 @@ biggest_functions() { # $1 temp file with the right extension → "name La-b（n
   perl -e 'alarm 3; exec @ARGV' "$lz" --csv "$1" 2>/dev/null > "$tmp/lizard.csv" || return 0
   perl -ne 'print "$1\t$2\t$3\t$4\n" if /^(\d+),[^"]*"(.+)@(\d+)-(\d+)@[^"]*"/' "$tmp/lizard.csv" \
     | sort -t "$(printf '\t')" -k1,1nr | head -3 \
-    | perl -CSD -ne 'chomp; my ($n,$f,$a,$b) = split /\t/; push @o, "$f L$a-$b（$n 行）";
+    | perl -ne 'chomp; my ($n,$f,$a,$b) = split /\t/; push @o, "$f L$a-$b（$n 行）";
         END { print join("；", @o) if @o }'
 }
 
@@ -141,7 +141,7 @@ while IFS= read -r -d '' path; do
       base_name=${name%.*}
       cap=$(printf '%s' "${base_name:0:1}" | tr 'a-z' 'A-Z')${base_name:1}
       echo "✗ ${path}：文件名 \"${base_name}\" 是万金油名字，搜索时分不清" >> "$out"
-      echo "改法：前面加上领域，比如 Usage${cap}.${name##*.}；文件头和引用它的地方一起改" >> "$out"
+      echo "改法：前面加上这个文件所属的领域，如 Order${cap}.${name##*.}；文件头和引用它的地方一起改" >> "$out"
       ;;
   esac
 

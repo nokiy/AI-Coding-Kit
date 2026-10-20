@@ -46,7 +46,7 @@ staged() { git add -A; gate --staged; }
 
 # ---- rule 1: generic file names ----
 repo; echo 'let a = 1' | put Sources/utils.swift; staged
-check "generic name utils.swift blocks" 1 '✗ Sources/utils.swift：文件名 "utils" 是万金油名字' 'Usage' '规则：AI-Coding-Kit protocols/file-gate.md'
+check "generic name utils.swift blocks" 1 '✗ Sources/utils.swift：文件名 "utils" 是万金油名字' '改法：前面加上这个文件所属的领域，如 OrderUtils.swift；文件头和引用它的地方一起改' '规则：AI-Coding-Kit protocols/file-gate.md'
 repo; echo x | put types.ts; echo x | put Manager.kt; echo x | put DATA.py; staged
 check "generic names are case-insensitive, all reported" 1 'types.ts：' 'Manager.kt：' 'DATA.py：'
 repo; for f in OrderUtils.swift order_utils.py main.go index.ts App.swift mod.rs lib.rs __init__.py; do
@@ -140,15 +140,15 @@ cd "$T"; mkdir -p norepo; cd norepo; gate --staged; check "outside a repo exits 
 repo; gate --bogus; check "bad arguments exit 2" 2 'usage'
 
 # ---- lizard ----
-repo; { echo 'f() {'; lines 405; echo '}'; } | put a.sh; git add -A
+repo; { echo 'f() {'; lines 405; echo '}'; echo 'g() {'; echo x; echo '}'; } | put a.sh; git add -A
 LIZARD=/nonexistent PATH=/usr/bin:/bin gate --staged
-check "lizard absent: still blocks, no function line" 1 'a.sh：407 行' '!最大的函数'
+check "lizard absent: still blocks, no function line" 1 'a.sh：410 行' '!最大的函数'
 printf '#!/bin/sh\nexit 3\n' > "$T/badlizard"; chmod +x "$T/badlizard"
 LIZARD="$T/badlizard" gate --staged
-check "lizard failing: still blocks, no function line" 1 'a.sh：407 行' '!最大的函数'
+check "lizard failing: still blocks, no function line" 1 'a.sh：410 行' '!最大的函数'
 lz=$REAL_LZ
 if [ -x "$lz" ]; then
-  LIZARD="$lz" gate --staged; check "lizard present: largest functions listed" 1 '最大的函数：f L1-407'
+  LIZARD="$lz" gate --staged; check "lizard present: largest functions listed" 1 '最大的函数：f L1-407（407 行）；g L408-410（3 行）'
 else
   echo "skip lizard present: lizard not installed"
 fi

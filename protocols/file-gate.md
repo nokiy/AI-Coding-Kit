@@ -68,7 +68,7 @@ The first line names the layer: `✗ 提交被拦（file-gate）` (pre-commit) o
 断行方法：把长表达式拆成中间变量 / 参数一个一行 / 长字符串拆开或移到常量
 
 ✗ <path>：文件名 "<base>" 是万金油名字，搜索时分不清
-改法：前面加上领域，比如 Usage<Base>.<ext>；文件头和引用它的地方一起改
+改法：前面加上这个文件所属的领域，如 Order<Base>.<ext>；文件头和引用它的地方一起改
 ```
 
 A passing run prints `✓ file-gate：检查了 N 个文件，全部通过`.
