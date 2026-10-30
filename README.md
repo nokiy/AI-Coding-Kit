@@ -57,6 +57,12 @@ Every code file a commit or PR touches is judged whole: at most 400 lines, no li
 
 提交或 PR 碰到的每个代码文件整份检查：不超过 400 行、单行不超过 200 字符、不用万金油文件名。pre-commit 钩子查暂存版本，CI 查 PR 改动并一锤定音。
 
+### [Quality Gate](./.github/workflows/quality.yml)
+
+The reusable CI workflow project stubs call: File gate → lint → build → test, plus a `secrets` job on pull requests that runs gitleaks 8.30.1 over exactly the PR's commits (`base.sha..head.sha`), redacted, with the repo's `.gitleaks.toml` when present. `secret-scan: false` turns the scan off.
+
+项目存根调用的中央质检门：文件检查 → lint → build → test；PR 上另有 `secrets` 任务，用 gitleaks 8.30.1 只扫本 PR 的提交，日志打码，仓库根有 `.gitleaks.toml` 就用它。`secret-scan: false` 关掉。
+
 ---
 
 ## Usage / 使用

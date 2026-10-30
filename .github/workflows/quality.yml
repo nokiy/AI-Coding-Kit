@@ -7,7 +7,8 @@
 # JSON text (label arrays can only travel as text), hence fromJSON.
 #
 # Every run also executes the File gate (protocols/file-gate.md) on the PR diff;
-# no input turns it off.
+# no input turns it off. Pull-request runs add the secrets job: gitleaks over the
+# PR's own commits, logs redacted (secret-scan: false turns it off).
 #
 # Caller stub example (project .github/workflows/ci.yml):
 #   name: CI
@@ -53,6 +54,10 @@ on:
         description: "Node projects: major version to install (e.g. \"22\"), then npm ci before lint. Empty = skip"
         type: string
         default: ""
+      secret-scan:
+        description: "Pull requests: gitleaks over the PR's commits (base.sha..head.sha). false = skip"
+        type: boolean
+        default: true
 
 # No concurrency group on purpose: any cancellation (in-progress or queued) mails the
 # author, while a superseded run that exits green mails nobody — see "Skip if superseded".
@@ -146,3 +151,72 @@ jobs:
           if ${{ inputs.test }}; then exit 0; fi
           echo "::warning::tests failed once — retrying in-job (transient guard)"
           ${{ inputs.test }}
+
+  # Secrets: gitleaks over exactly the PR's commits, the CI twin of the local
+  # commit-secrets hook (same gitleaks version). base.sha..head.sha, not origin/main..HEAD,
+  # so dev-based repos scan only their own PR too. Findings print rule + file:line only.
+  secrets:
+    if: github.event_name == 'pull_request' && inputs.secret-scan
+    runs-on: ${{ fromJSON(vars.CI_RUNNER || inputs.runner) }}
+    env:
+      GITLEAKS_VERSION: "8.30.1"
+    steps:
+      # Same as the quality job's; the branch name travels via env (untrusted input).
+      - name: Skip if superseded
+        id: tip
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ github.head_ref }}
+          MINE: ${{ github.event.pull_request.head.sha }}
+        run: |
+          tip=$(gh api "repos/${{ github.repository }}/git/ref/heads/${REF}" --jq .object.sha 2>/dev/null || true)
+          if [ -n "$tip" ] && [ "$tip" != "$MINE" ]; then
+            echo "superseded by ${tip} — exiting green"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.tip.outputs.skip != 'true'
+        with:
+          fetch-depth: 0
+      # Official release tarball, verified against the same release's checksums file.
+      - name: Install gitleaks
+        if: steps.tip.outputs.skip != 'true'
+        run: |
+          case "$RUNNER_OS" in Linux) os=linux ;; macOS) os=darwin ;; *) os="" ;; esac
+          case "$RUNNER_ARCH" in X64) arch=x64 ;; ARM64) arch=arm64 ;; *) arch="" ;; esac
+          if [ -z "$os" ] || [ -z "$arch" ]; then
+            echo "::error::no gitleaks build for ${RUNNER_OS}/${RUNNER_ARCH}"
+            exit 1
+          fi
+          tarball="gitleaks_${GITLEAKS_VERSION}_${os}_${arch}.tar.gz"
+          url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          dir="${RUNNER_TEMP}/gitleaks"
+          mkdir -p "$dir" && cd "$dir"
+          curl -fsSLO "${url}/${tarball}"
+          curl -fsSLO "${url}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          if command -v sha256sum >/dev/null; then sha="sha256sum"; else sha="shasum -a 256"; fi
+          if ! sum=$(grep " ${tarball}\$" "gitleaks_${GITLEAKS_VERSION}_checksums.txt"); then
+            echo "::error::${tarball} missing from the release checksums"
+            exit 1
+          fi
+          printf '%s\n' "$sum" | $sha -c -
+          tar -xzf "$tarball" gitleaks
+          ./gitleaks version
+      # Fail closed: gitleaks exits 0 when its own git call fails, so the range is
+      # resolved first. Exit 1 = leaks or a gitleaks error; both fail the job.
+      - name: Scan PR commits
+        if: steps.tip.outputs.skip != 'true'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if ! count=$(git rev-list --count "${BASE}..${HEAD}"); then
+            echo "::error::cannot resolve ${BASE}..${HEAD}"
+            exit 1
+          fi
+          echo "scanning ${count} commit(s): ${BASE}..${HEAD}"
+          [ "$count" -gt 0 ] || exit 0
+          cfg=()
+          [ -f .gitleaks.toml ] && cfg=(--config .gitleaks.toml)
+          "${RUNNER_TEMP}/gitleaks/gitleaks" git -v --redact --no-banner --no-color \
+            "${cfg[@]}" --log-opts="${BASE}..${HEAD}" .
