@@ -152,14 +152,14 @@ jobs:
           echo "::warning::tests failed once — retrying in-job (transient guard)"
           ${{ inputs.test }}
 
-  # Secrets: gitleaks over exactly the PR's commits, the CI twin of the local
-  # commit-secrets hook (same gitleaks version). base.sha..head.sha, not origin/main..HEAD,
-  # so dev-based repos scan only their own PR too. Findings print rule + file:line only.
+  # Secrets: scripts/secret-scan/secret-scan.sh (the CI twin of the local commit-secrets
+  # hook) over exactly the PR's commits. base.sha..head.sha, not origin/main..HEAD, so
+  # dev-based repos scan only their own PR too. Findings print rule + file:line only.
+  # The script runs from the kit at this workflow's own commit, as the File gate does,
+  # so self-test exercises the identical command.
   secrets:
     if: github.event_name == 'pull_request' && inputs.secret-scan
     runs-on: ${{ fromJSON(vars.CI_RUNNER || inputs.runner) }}
-    env:
-      GITLEAKS_VERSION: "8.30.1"
     steps:
       # Same as the quality job's; the branch name travels via env (untrusted input).
       - name: Skip if superseded
@@ -178,45 +178,27 @@ jobs:
         if: steps.tip.outputs.skip != 'true'
         with:
           fetch-depth: 0
-      # Official release tarball, verified against the same release's checksums file.
-      - name: Install gitleaks
+      - name: Secret scan — locate kit
         if: steps.tip.outputs.skip != 'true'
+        env:
+          KIT_REPO: ${{ job.workflow_repository }}
+          KIT_SHA: ${{ job.workflow_sha }}
         run: |
-          case "$RUNNER_OS" in Linux) os=linux ;; macOS) os=darwin ;; *) os="" ;; esac
-          case "$RUNNER_ARCH" in X64) arch=x64 ;; ARM64) arch=arm64 ;; *) arch="" ;; esac
-          if [ -z "$os" ] || [ -z "$arch" ]; then
-            echo "::error::no gitleaks build for ${RUNNER_OS}/${RUNNER_ARCH}"
+          if [ -z "$KIT_REPO" ] || [ -z "$KIT_SHA" ]; then
+            echo "::error::job.workflow_repository / job.workflow_sha empty — cannot locate secret-scan"
             exit 1
           fi
-          tarball="gitleaks_${GITLEAKS_VERSION}_${os}_${arch}.tar.gz"
-          url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
-          dir="${RUNNER_TEMP}/gitleaks"
-          mkdir -p "$dir" && cd "$dir"
-          curl -fsSLO "${url}/${tarball}"
-          curl -fsSLO "${url}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
-          if command -v sha256sum >/dev/null; then sha="sha256sum"; else sha="shasum -a 256"; fi
-          if ! sum=$(grep " ${tarball}\$" "gitleaks_${GITLEAKS_VERSION}_checksums.txt"); then
-            echo "::error::${tarball} missing from the release checksums"
-            exit 1
-          fi
-          printf '%s\n' "$sum" | $sha -c -
-          tar -xzf "$tarball" gitleaks
-          ./gitleaks version
-      # Fail closed: gitleaks exits 0 when its own git call fails, so the range is
-      # resolved first. Exit 1 = leaks or a gitleaks error; both fail the job.
+          echo "secret-scan from ${KIT_REPO}@${KIT_SHA}"
+      - uses: actions/checkout@v4
+        if: steps.tip.outputs.skip != 'true'
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .secret-scan-kit
+      # Exit 1 = leaks or a gitleaks error, 2 = unresolvable range or install failure.
       - name: Scan PR commits
         if: steps.tip.outputs.skip != 'true'
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
-        run: |
-          if ! count=$(git rev-list --count "${BASE}..${HEAD}"); then
-            echo "::error::cannot resolve ${BASE}..${HEAD}"
-            exit 1
-          fi
-          echo "scanning ${count} commit(s): ${BASE}..${HEAD}"
-          [ "$count" -gt 0 ] || exit 0
-          cfg=()
-          [ -f .gitleaks.toml ] && cfg=(--config .gitleaks.toml)
-          "${RUNNER_TEMP}/gitleaks/gitleaks" git -v --redact --no-banner --no-color \
-            "${cfg[@]}" --log-opts="${BASE}..${HEAD}" .
+        run: .secret-scan-kit/scripts/secret-scan/secret-scan.sh "$BASE" "$HEAD"
