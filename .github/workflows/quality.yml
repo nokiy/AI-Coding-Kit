@@ -7,7 +7,8 @@
 # JSON text (label arrays can only travel as text), hence fromJSON.
 #
 # Every run also executes the File gate (protocols/file-gate.md) on the PR diff;
-# no input turns it off.
+# no input turns it off. Pull-request runs add the secrets job: gitleaks over the
+# PR's own commits, logs redacted (secret-scan: false turns it off).
 #
 # Caller stub example (project .github/workflows/ci.yml):
 #   name: CI
@@ -53,6 +54,10 @@ on:
         description: "Node projects: major version to install (e.g. \"22\"), then npm ci before lint. Empty = skip"
         type: string
         default: ""
+      secret-scan:
+        description: "Pull requests: gitleaks over the PR's commits (base.sha..head.sha). false = skip"
+        type: boolean
+        default: true
 
 # No concurrency group on purpose: any cancellation (in-progress or queued) mails the
 # author, while a superseded run that exits green mails nobody — see "Skip if superseded".
@@ -146,3 +151,54 @@ jobs:
           if ${{ inputs.test }}; then exit 0; fi
           echo "::warning::tests failed once — retrying in-job (transient guard)"
           ${{ inputs.test }}
+
+  # Secrets: scripts/secret-scan/secret-scan.sh (the CI twin of the local commit-secrets
+  # hook) over exactly the PR's commits. base.sha..head.sha, not origin/main..HEAD, so
+  # dev-based repos scan only their own PR too. Findings print rule + file:line only.
+  # The script runs from the kit at this workflow's own commit, as the File gate does,
+  # so self-test exercises the identical command.
+  secrets:
+    if: github.event_name == 'pull_request' && inputs.secret-scan
+    runs-on: ${{ fromJSON(vars.CI_RUNNER || inputs.runner) }}
+    steps:
+      # Same as the quality job's; the branch name travels via env (untrusted input).
+      - name: Skip if superseded
+        id: tip
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ github.head_ref }}
+          MINE: ${{ github.event.pull_request.head.sha }}
+        run: |
+          tip=$(gh api "repos/${{ github.repository }}/git/ref/heads/${REF}" --jq .object.sha 2>/dev/null || true)
+          if [ -n "$tip" ] && [ "$tip" != "$MINE" ]; then
+            echo "superseded by ${tip} — exiting green"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.tip.outputs.skip != 'true'
+        with:
+          fetch-depth: 0
+      - name: Secret scan — locate kit
+        if: steps.tip.outputs.skip != 'true'
+        env:
+          KIT_REPO: ${{ job.workflow_repository }}
+          KIT_SHA: ${{ job.workflow_sha }}
+        run: |
+          if [ -z "$KIT_REPO" ] || [ -z "$KIT_SHA" ]; then
+            echo "::error::job.workflow_repository / job.workflow_sha empty — cannot locate secret-scan"
+            exit 1
+          fi
+          echo "secret-scan from ${KIT_REPO}@${KIT_SHA}"
+      - uses: actions/checkout@v4
+        if: steps.tip.outputs.skip != 'true'
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .secret-scan-kit
+      # Exit 1 = leaks or a gitleaks error, 2 = unresolvable range or install failure.
+      - name: Scan PR commits
+        if: steps.tip.outputs.skip != 'true'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: .secret-scan-kit/scripts/secret-scan/secret-scan.sh "$BASE" "$HEAD"
