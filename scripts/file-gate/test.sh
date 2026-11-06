@@ -125,7 +125,7 @@ repo; lines 351 | put old.sh; git add -A; git commit -qm old; git checkout -qb f
 echo y | put new.sh; git add -A; git commit -qm new; gate --base master
 check "--base: untouched oversized file not judged" 0 '检查了 1 个文件'
 echo y >> old.sh; git add -A; git commit -qm touch; gate --base master
-check "--base: touched file judged whole (no ratchet)" 1 '✗ CI 文件检查未通过（file-gate）' 'old.sh：402 行'
+check "--base: touched file judged whole (no ratchet)" 1 '✗ CI 文件检查未通过（file-gate）' 'old.sh：352 行'
 repo; git checkout -qb feat; lines 351 | put a.sh; git add -A; git commit -qm a; lines 10 | put a.sh; gate --base master
 check "--base judges HEAD, not the working tree" 1 'a.sh：351 行'
 repo; git checkout -qb feat; lines 351 | put a.sh; git add -A; git commit -qm a; git checkout -q master
