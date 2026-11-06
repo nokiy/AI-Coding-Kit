@@ -9,7 +9,7 @@
 #
 # Rules, on the whole file:
 #   1. generic file name (stem in GENERIC below) → block
-#   2. more than 400 lines → block (largest functions listed when lizard is available)
+#   2. more than 350 lines → block (largest functions listed when lizard is available)
 #   3. any line longer than 200 characters (Unicode characters) → block
 #
 # A file is skipped when any of these holds:
@@ -24,7 +24,7 @@
 # --staged also passes while a merge, rebase, cherry-pick or revert is in progress: CI judges those.
 # Lizard: $LIZARD, else lizard on PATH, else $HOME/.local/bin/lizard; absent or failing → no function list.
 
-MAX_LINES=400
+MAX_LINES=350
 MAX_CHARS=200
 LINE_LIST_CAP=10
 CODE_EXT=" swift go ts tsx js jsx mjs cjs py rs kt java rb dart c h cpp hpp m mm vue svelte html css scss sh bash zsh "
