@@ -1,9 +1,9 @@
 # File Gate Protocol
 
-> Every code file a commit or PR touches is judged whole: at most 400 lines, no line over
+> Every code file a commit or PR touches is judged whole: at most 350 lines, no line over
 > 200 characters, and a file name that says what it is about.
 >
-> 提交或 PR 碰到的每个代码文件都整份检查：不超过 400 行、单行不超过 200 字符、文件名要说得出领域。
+> 提交或 PR 碰到的每个代码文件都整份检查：不超过 350 行、单行不超过 200 字符、文件名要说得出领域。
 
 Implementation: [`scripts/file-gate/file-gate.sh`](../scripts/file-gate/file-gate.sh).
 
@@ -19,7 +19,7 @@ Implementation: [`scripts/file-gate/file-gate.sh`](../scripts/file-gate/file-gat
 | # | Rule | Blocks when |
 |---|------|-------------|
 | 1 | Generic file name | the base name without its last extension, lower-cased, is one of: util utils helper helpers type types model models common config configs constant constants extension extensions misc shared base manager service services data (`OrderUtils.swift`, `order_utils.py`, `main`, `index`, `App`, `mod`, `lib`, `__init__` pass) |
-| 2 | File size | more than **400** lines (a last line without a trailing newline counts) |
+| 2 | File size | more than **350** lines (a last line without a trailing newline counts) |
 | 3 | Line length | any line longer than **200** characters, counted as Unicode characters (a CJK character is 1; a CR before the newline is not counted) |
 
 ## Two layers
@@ -56,7 +56,7 @@ The first line names the layer: `✗ 提交被拦（file-gate）` (pre-commit) o
 `规则：AI-Coding-Kit protocols/file-gate.md`.
 
 ```
-✗ <path>：<n> 行，超过 400 行硬线
+✗ <path>：<n> 行，超过 350 行硬线
 最大的函数：<name> L<a>-<b>（<nloc> 行）；…
 拆分步骤：
  1. 按职责找切口：顶层类型、extension、// MARK: 段落

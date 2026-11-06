@@ -1,6 +1,6 @@
 # scripts/file-gate/
 
-Whole-file gate for commits and PRs: 400 lines, 200 characters per line, no generic file names.
+Whole-file gate for commits and PRs: 350 lines, 200 characters per line, no generic file names.
 Spec: [`protocols/file-gate.md`](../../protocols/file-gate.md).
 
 | File | Role |
