@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # secret-scan — gitleaks over a commit range of the repo in cwd, logs redacted.
-# CI twin of the local commit-secrets hook: same gitleaks version, run by the secrets job
+# CI twin of the local commit-secrets hook: same gitleaks version, run by the quality job
 # of .github/workflows/quality.yml and asserted by test.sh. Portable: macOS /bin/bash 3.2
 # and Linux bash; needs git, curl, tar and sha256sum or shasum.
 #
