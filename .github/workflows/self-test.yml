@@ -1,5 +1,5 @@
 # Kit self-test: every PR into master runs the reusable quality gate against this repo,
-# so the File gate step judges the PR's own files, the secrets job scans the PR's own
+# so the File gate step judges the PR's own files, the Secret scan steps scan the PR's own
 # commits (clean path), and the test scripts prove file-gate.sh and secret-scan.sh on Linux
 # (default runner ubuntu-latest) — secret-scan's test.sh asserts the leak path goes red.
 name: Self-test
