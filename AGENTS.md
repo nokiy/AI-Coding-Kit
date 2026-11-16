@@ -12,7 +12,7 @@ Default seven-role vocabulary, label string = role name. See `docs/agents/triage
 
 ### Domain docs
 
-`docs/context/CONTEXT.md` + `docs/adr/`, created lazily. See `docs/agents/domain.md`.
+Single-context: root `GLOSSARY.md` + `docs/adr/`, created lazily by domain-modeling. See `docs/agents/domain.md`.
 
 ### Repair ladder
 
