@@ -88,10 +88,10 @@ npm run fmt:check && npm run lint && npm run typecheck && npm run build && npm r
 ```
 
 
-Done when: no `eslint.config.*` / `.eslintrc*`, no `eslint` in `package.json`, no `package-lock.json`, only `bun.lock`, and `npm run fmt:check` exits 0.
+Fresh scaffold done when: no `eslint.config.*` / `.eslintrc*`, no `eslint` in `package.json`, no `package-lock.json`, only `bun.lock`, and step 7 (`fmt:check` / `lint` / `typecheck` / `build` / `test`) exits 0.
 Use `npm run <script>`, never `npm install` / `npm ci`: npm would write a `package-lock.json`.
 
-完成标准：没有 `eslint.config.*` / `.eslintrc*`，`package.json` 里没有 `eslint`，没有 `package-lock.json`，只有 `bun.lock`，`npm run fmt:check` 退出 0。脚本用 `npm run <script>` 跑，NEVER `npm install` / `npm ci`：npm 会写出 `package-lock.json`。
+新脚手架完成标准：没有 `eslint.config.*` / `.eslintrc*`，`package.json` 里没有 `eslint`，没有 `package-lock.json`，只有 `bun.lock`，第 7 步（`fmt:check` / `lint` / `typecheck` / `build` / `test`）退出 0。脚本用 `npm run <script>` 跑，NEVER `npm install` / `npm ci`：npm 会写出 `package-lock.json`。
 
 <a id="ci"></a>CI: in the project's stub of [`quality.yml`](../.github/workflows/quality.yml) set `bun: true` (the gate installs the `packageManager` Bun and runs `bun install --frozen-lockfile`) and `lint: npm run fmt:check && npm run lint && npm run typecheck`. A project without a `fmt:check` script (a converted existing project) sets `lint: npm run lint && npm run typecheck`.
 
@@ -101,7 +101,11 @@ CI：项目的 [`quality.yml`](../.github/workflows/quality.yml) 存根里设 `b
 
 Run the fresh-scaffold steps without Oxfmt: skip the `oxfmtrc.json` copy in step 2, pass only `package-snippet.json` to step 3, skip step 6, and drop `npm run fmt:check` from step 7. Formatting would rewrite most files at once, so it never rides along with the conversion.
 
+Existing project done when: no `.oxfmtrc.json`, no `fmt` / `fmt:check` scripts, no `oxfmt` dependency; no `eslint.config.*` / `.eslintrc*`, no `eslint` in `package.json`, no `package-lock.json`, only `bun.lock`; and `lint` / `typecheck` / `build` / `test` exit 0.
+
 照新脚手架的步骤做，但不带 Oxfmt：第 2 步不拷 `oxfmtrc.json`，第 3 步只传 `package-snippet.json`，跳过第 6 步，第 7 步去掉 `npm run fmt:check`。排版会一次改写大部分文件，所以不跟转换一起做。
+
+已有项目完成标准：没有 `.oxfmtrc.json`，没有 `fmt` / `fmt:check` 脚本，没有 `oxfmt` 依赖；没有 `eslint.config.*` / `.eslintrc*`，`package.json` 里没有 `eslint`，没有 `package-lock.json`，只有 `bun.lock`；`lint` / `typecheck` / `build` / `test` 退出 0。
 
 To format an existing project later, take its own route:
 
