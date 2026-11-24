@@ -63,6 +63,12 @@ The reusable CI workflow project stubs call: File gate → lint → build → te
 
 项目存根调用的中央质检门：文件检查 → lint → build → test；PR 上同一任务还在后台、与 lint / build / test 并行跑 gitleaks 8.30.1，只扫本 PR 的提交，日志打码，仓库根有 `.gitleaks.toml` 就用它。`secret-scan: false` 关掉。
 
+### [New JS Project Toolchain](./guides/new-js-project-toolchain.md)
+
+The default toolchain for a new JS/TS project (Bun, Oxlint, `bun check`, Vitest): a starter config in [`configs/js-default/`](./configs/js-default) and the steps that convert a `create-next-app --example with-supabase --use-bun` scaffold. The single source; skills link here.
+
+新 JS/TS 项目默认工具链（Bun、Oxlint、`bun check`、Vitest）：起点配置加脚手架转换步骤，唯一出处，技能只链接这里。
+
 ---
 
 ## Usage / 使用

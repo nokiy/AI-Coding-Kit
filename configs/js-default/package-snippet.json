@@ -1,0 +1,13 @@
+{
+  "packageManager": "bun@1.4.5",
+  "scripts": {
+    "lint": "oxlint",
+    "typecheck": "bun check",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "bun": "1.4.5",
+    "oxlint": "1.95.0",
+    "vitest": "^4.1.9"
+  }
+}
