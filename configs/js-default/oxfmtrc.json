@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 140,
+  "ignorePatterns": [
+    "*",
+    "!*/",
+    "!*.js",
+    "!*.jsx",
+    "!*.ts",
+    "!*.tsx",
+    "!*.mjs",
+    "!*.cjs",
+    "!*.json",
+    "!*.jsonc",
+    "!*.css",
+    "/.next/",
+    "/coverage/",
+    "/next-env.d.ts",
+    "*.tsbuildinfo",
+    "bun.lock",
+    "package-lock.json"
+  ]
+}
