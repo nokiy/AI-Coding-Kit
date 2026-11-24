@@ -144,25 +144,6 @@
       "rules": {
         "typescript/no-require-imports": "off"
       }
-    },
-    {
-      "files": [
-        "app/protected/page.tsx",
-        "components/auth-button.tsx",
-        "components/forgot-password-form.tsx",
-        "components/login-form.tsx",
-        "components/sign-up-form.tsx",
-        "components/theme-switcher.tsx",
-        "components/ui/button.tsx",
-        "components/update-password-form.tsx",
-        "lib/supabase/proxy.ts",
-        "lib/utils.ts",
-        "tailwind.config.ts"
-      ],
-      "rules": {
-        "id-length": "off",
-        "id-denylist": "off"
-      }
     }
   ]
 }

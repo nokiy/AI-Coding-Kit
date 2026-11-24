@@ -11,15 +11,15 @@ Skills and docs link here; they never copy the steps or the versions.
 
 | File | Copy to | What it is |
 |------|---------|------------|
-| `oxlintrc.json` | `.oxlintrc.json` | Oxlint with the react / nextjs / import / jsx-a11y / typescript plugins: the rules `eslint-config-next` turned on, the naming rules of [`eslint-naming.json`](../configs/eslint-naming.json), and overrides only for files the default scaffold ships |
+| `oxlintrc.json` | `.oxlintrc.json` | Oxlint with the react / nextjs / import / jsx-a11y / typescript plugins: the rules `eslint-config-next` turned on, the naming rules of [`eslint-naming.json`](../configs/eslint-naming.json), and an override for the scaffold's `tailwind.config.ts` (`require`) |
 | `package-snippet.json` | merged into `package.json` | `packageManager`, the `lint` / `typecheck` / `test` scripts, and the `bun` / `oxlint` / `vitest` dev dependencies. The versions live only here |
 | `smoke.test.ts` | `tests/smoke.test.ts` | One test, because `vitest run` exits 1 when it finds no test file; replace it once real tests exist |
 
-`oxlintrc.json` 是 Oxlint 配置：`eslint-config-next` 打开的规则、`eslint-naming.json` 的命名规则，外加只针对默认脚手架自带文件的覆盖项；`package-snippet.json` 合并进 `package.json`，版本只写在这里；`smoke.test.ts` 是一条冒烟测试（`vitest run` 找不到测试文件会退出 1），有了真测试就替换它。
+`oxlintrc.json` 是 Oxlint 配置：`eslint-config-next` 打开的规则、`eslint-naming.json` 的命名规则，外加脚手架 `tailwind.config.ts`（`require`）的覆盖项；`package-snippet.json` 合并进 `package.json`，版本只写在这里；`smoke.test.ts` 是一条冒烟测试（`vitest run` 找不到测试文件会退出 1），有了真测试就替换它。
 
-Naming rules: the last override switches them off for the files `create-next-app --example with-supabase` generates (short names like `e` and `cn`, Supabase's `data`). Every new file is checked; when you rewrite one of those files, drop it from the list.
+Naming rules: the starter lists no files. Conversion step 5 runs Oxlint once and writes the files that already break `id-length` / `id-denylist` into an override in the project's `.oxlintrc.json`; the same step works when converting an existing project. Every new file is checked; when you rewrite a listed file, drop it from the list.
 
-命名规则：最后一个覆盖项对脚手架生成的文件关掉命名检查（`e`、`cn` 这类短名和 Supabase 的 `data`）。新文件都要过检查；改写了名单里的文件，就把它从名单删掉。
+命名规则：起点配置不带文件名单。转换第 5 步跑一次 Oxlint，把已经违反 `id-length` / `id-denylist` 的文件写进项目 `.oxlintrc.json` 的一个覆盖项；转换已有项目也用这一步。新文件都要过检查；改写了名单里的文件，就把它从名单删掉。
 
 Another framework: the preset is written for Next.js + React. Without Next.js, drop the `nextjs` plugin and its `nextjs/*` rules; without React, also drop `react` / `jsx-a11y` and their rules.
 
@@ -59,7 +59,23 @@ fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
 # 4. Reinstall with the pinned Bun (the scaffold's bun.lock came from whatever bun is global)
 npx -y "$(node -p "require('./package.json').packageManager")" install
 
-# 5. All four checks exit 0
+# 5. Naming baseline: files that already break the naming rules go into one override; new files stay checked
+node -e '
+const fs = require("fs");
+const { spawnSync } = require("child_process");
+const run = spawnSync("node_modules/.bin/oxlint", ["--format=json"], { encoding: "utf8" });
+const naming = ["eslint(id-length)", "eslint(id-denylist)"];
+const files = [...new Set(JSON.parse(run.stdout).diagnostics
+  .filter((diag) => naming.includes(diag.code)).map((diag) => diag.filename))].sort();
+if (files.length) {
+  const config = JSON.parse(fs.readFileSync(".oxlintrc.json", "utf8"));
+  config.overrides = [...(config.overrides ?? []), { files, rules: { "id-length": "off", "id-denylist": "off" } }];
+  fs.writeFileSync(".oxlintrc.json", JSON.stringify(config, null, 2) + "\n");
+}
+console.log("naming baseline: " + files.length + " files");
+'
+
+# 6. All four checks exit 0
 npm run lint && npm run typecheck && npm run build && npm run test
 ```
 
