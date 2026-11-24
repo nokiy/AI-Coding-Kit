@@ -25,6 +25,14 @@
 #         test: ./test.sh
 #         runner: '"macos-15"'
 #
+# Private dependencies (e.g. a private SwiftPM package): pass the https URL prefixes in
+# private-deps and a read-only token as secret deps-token. Before lint / build / test, git
+# rewrites each prefix to the token URL for this job only (GIT_CONFIG_* through $GITHUB_ENV,
+# never git config --global: self-hosted runners share the user's HOME). Unset = no change.
+#         private-deps: https://github.com/<owner>/<private-repo>
+#       secrets:
+#         deps-token: ${{ secrets.<REPO_SECRET> }}
+#
 # Node project stub: pass node-version and plain script names, e.g.
 #         node-version: "22"
 #         lint: npm run lint && npm run typecheck
@@ -59,6 +67,14 @@ on:
         description: "Pull requests: gitleaks over the PR's commits (base.sha..head.sha). false = skip"
         type: boolean
         default: true
+      private-deps:
+        description: "Space-separated https://github.com/ URL prefixes fetched with secret deps-token (empty = skip)"
+        type: string
+        default: ""
+    secrets:
+      deps-token:
+        description: "Read-only token for the private-deps URLs"
+        required: false
 
 # No concurrency group on purpose: any cancellation (in-progress or queued) mails the
 # author, while a superseded run that exits green mails nobody — see "Skip if superseded".
@@ -164,6 +180,34 @@ jobs:
             echo $? >"$2.tmp" && mv "$2.tmp" "$2"' secret-scan "$out" "$code" \
             </dev/null >/dev/null 2>&1 &
           echo "secret scan running in the background (pid $!)"
+      # Private deps: one insteadOf pair per prefix, numbered after any GIT_CONFIG_* already set.
+      # Secrets can't sit in an if:, so a missing token is checked here and only warns: the
+      # build then fails on its own git error, which names the URL.
+      - name: Private deps — credentials
+        if: steps.tip.outputs.skip != 'true' && inputs.private-deps != ''
+        env:
+          DEPS_TOKEN: ${{ secrets.deps-token }}
+          PRIVATE_DEPS: ${{ inputs.private-deps }}
+        run: |
+          if [ -z "$DEPS_TOKEN" ]; then
+            echo "::warning::private-deps is set but secret deps-token is empty: ${PRIVATE_DEPS}"
+            exit 0
+          fi
+          echo "::add-mask::${DEPS_TOKEN}"
+          n=${GIT_CONFIG_COUNT:-0}
+          for prefix in $PRIVATE_DEPS; do
+            case "$prefix" in
+              https://github.com/?*) ;;
+              *) echo "::error::private-deps: ${prefix} is not an https://github.com/ URL"; exit 1 ;;
+            esac
+            {
+              echo "GIT_CONFIG_KEY_${n}=url.https://x-access-token:${DEPS_TOKEN}@${prefix#https://}.insteadOf"
+              echo "GIT_CONFIG_VALUE_${n}=${prefix}"
+            } >> "$GITHUB_ENV"
+            echo "private dep: ${prefix}"
+            n=$((n + 1))
+          done
+          echo "GIT_CONFIG_COUNT=${n}" >> "$GITHUB_ENV"
       # Node preset: the same toolchain on hosted and self-hosted runners, whatever the
       # runner image ships. npm ci here keeps project stubs to plain script names.
       - uses: actions/setup-node@v4
