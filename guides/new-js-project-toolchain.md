@@ -12,12 +12,12 @@ Skills and docs link here; they never copy the steps or the versions.
 | File | Copy to | What it is |
 |------|---------|------------|
 | `oxlintrc.json` | `.oxlintrc.json` | Oxlint with the react / nextjs / import / jsx-a11y / typescript plugins: the rules `eslint-config-next` turned on, the naming rules of [`eslint-naming.json`](../configs/eslint-naming.json), and an override for the scaffold's `tailwind.config.ts` (`require`) |
-| `package-snippet.json` | merged into `package.json` | `packageManager`, the `lint` / `typecheck` / `test` scripts, and the `bun` / `oxlint` / `vitest` dev dependencies. The versions live only here |
+| `package-snippet.json` | merged into `package.json` | `packageManager`, the `lint` / `typecheck` / `test` scripts, and the `bun` / `oxlint` / `vitest` dev dependencies. The versions live only in the snippets (this one and `fmt-snippet.json`) |
 | `oxfmtrc.json` | `.oxfmtrc.json` | Fresh scaffolds only. Oxfmt with `printWidth` 140, other options default; `ignorePatterns` is an allowlist (`*`, then `!*/`, then js / jsx / ts / tsx / mjs / cjs / json / jsonc / css), plus build output and lock files |
 | `fmt-snippet.json` | merged into `package.json` | Fresh scaffolds only. The `fmt` (write) / `fmt:check` (check only) scripts and the exactly pinned `oxfmt` dev dependency |
 | `smoke.test.ts` | `tests/smoke.test.ts` | One test, because `vitest run` exits 1 when it finds no test file; replace it once real tests exist |
 
-`oxlintrc.json` 是 Oxlint 配置：`eslint-config-next` 打开的规则、`eslint-naming.json` 的命名规则，外加脚手架 `tailwind.config.ts`（`require`）的覆盖项；`package-snippet.json` 合并进 `package.json`，版本只写在这里；`oxfmtrc.json` 与 `fmt-snippet.json` 只给新脚手架：Oxfmt 配置（行宽 140，其余默认，`ignorePatterns` 写成白名单，只放行 js / jsx / ts / tsx / mjs / cjs / json / jsonc / css，另排除构建产物与锁文件）和 `fmt`（写入）/ `fmt:check`（只检查）两个脚本加精确钉版的 `oxfmt`；`smoke.test.ts` 是一条冒烟测试（`vitest run` 找不到测试文件会退出 1），有了真测试就替换它。
+`oxlintrc.json` 是 Oxlint 配置：`eslint-config-next` 打开的规则、`eslint-naming.json` 的命名规则，外加脚手架 `tailwind.config.ts`（`require`）的覆盖项；`package-snippet.json` 合并进 `package.json`，版本只写在两份片段里（它和 `fmt-snippet.json`）；`oxfmtrc.json` 与 `fmt-snippet.json` 只给新脚手架：Oxfmt 配置（行宽 140，其余默认，`ignorePatterns` 写成白名单，只放行 js / jsx / ts / tsx / mjs / cjs / json / jsonc / css，另排除构建产物与锁文件）和 `fmt`（写入）/ `fmt:check`（只检查）两个脚本加精确钉版的 `oxfmt`；`smoke.test.ts` 是一条冒烟测试（`vitest run` 找不到测试文件会退出 1），有了真测试就替换它。
 
 Naming rules: the starter lists no files. Conversion step 5 runs Oxlint once and writes the files that already break `id-length` / `id-denylist` into an override in the project's `.oxlintrc.json`; the same step works when converting an existing project. Every new file is checked; when you rewrite a listed file, drop it from the list.
 
@@ -106,13 +106,13 @@ Run the fresh-scaffold steps without Oxfmt: skip the `oxfmtrc.json` copy in step
 To format an existing project later, take its own route:
 
 1. Clear the file-gate debt first ([`protocols/file-gate.md`](../protocols/file-gate.md): over-long files, over-long lines), so formatting does not push files over the limits.
-2. Add Oxfmt (`oxfmtrc.json` + `fmt-snippet.json`, as in steps 2–3), run `npm run fmt`, and land it as one PR that only formats.
+2. Add Oxfmt (`oxfmtrc.json` + `fmt-snippet.json`, then reinstall: steps 2–4), append the project's own generated or vendored directories to `ignorePatterns`, run `npm run fmt`, and land it as one PR that only formats.
 3. After it is squash-merged, add that commit's hash to `.git-blame-ignore-revs`; each clone runs `git config blame.ignoreRevsFile ':(optional).git-blame-ignore-revs'` once.
 
 已有项目要排版，单独走一条路：
 
 1. 先还 file-gate 旧债（[`protocols/file-gate.md`](../protocols/file-gate.md)：超长文件、超长行），免得排版把文件推过上限。
-2. 加 Oxfmt（`oxfmtrc.json` + `fmt-snippet.json`，同第 2–3 步），跑 `npm run fmt`，作为一个只排版的 PR 合进去。
+2. 加 Oxfmt（`oxfmtrc.json` + `fmt-snippet.json`，再重装：同第 2–4 步），把项目自己的生成目录、第三方目录追加进 `ignorePatterns`，跑 `npm run fmt`，作为一个只排版的 PR 合进去。
 3. squash 合并后，把那次提交的哈希登记进 `.git-blame-ignore-revs`；每个克隆跑一次 `git config blame.ignoreRevsFile ':(optional).git-blame-ignore-revs'`。
 
 ## Upgrade rule / 升级规则

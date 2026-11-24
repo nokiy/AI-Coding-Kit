@@ -65,9 +65,9 @@ The reusable CI workflow project stubs call: File gate → lint → build → te
 
 ### [New JS Project Toolchain](./guides/new-js-project-toolchain.md)
 
-The default toolchain for a new JS/TS project (Bun, Oxlint, `bun check`, Vitest): a starter config in [`configs/js-default/`](./configs/js-default) and the steps that convert a `create-next-app --example with-supabase --use-bun` scaffold. The single source; skills link here.
+The default toolchain for a new JS/TS project (Bun, Oxlint, Oxfmt for fresh scaffolds, `bun check`, Vitest): a starter config in [`configs/js-default/`](./configs/js-default) and the steps that convert a `create-next-app --example with-supabase --use-bun` scaffold. The single source; skills link here.
 
-新 JS/TS 项目默认工具链（Bun、Oxlint、`bun check`、Vitest）：起点配置加脚手架转换步骤，唯一出处，技能只链接这里。
+新 JS/TS 项目默认工具链（Bun、Oxlint、Oxfmt（只给新脚手架）、`bun check`、Vitest）：起点配置加脚手架转换步骤，唯一出处，技能只链接这里。
 
 ---
 
