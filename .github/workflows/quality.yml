@@ -39,9 +39,10 @@
 #         build: npm run build
 #         test: npm test
 #
-# Bun project stub: pass bun: true and plain script names; node-version is not needed
-# (the runner's own node/npm installs Bun). The Bun version is the packageManager field
-# of package.json (bun@<version>), installed into $RUNNER_TEMP, then bun install --frozen-lockfile.
+# Bun project stub: pass bun: true and plain script names; node-version is not needed.
+# Bun is opt-in only, never guessed from lockfiles. Its version is package.json's packageManager
+# (bun@<version>), installed with the runner's own node/npm into $RUNNER_TEMP so no runner image
+# needs Bun, then bun install --frozen-lockfile.
 #         bun: true
 #         lint: npm run lint && npm run typecheck
 #         build: npm run build
@@ -72,7 +73,7 @@ on:
         type: string
         default: ""
       bun:
-        description: "Bun projects: install Bun at package.json's packageManager version, then bun install --frozen-lockfile before lint. Independent of node-version; needs node/npm on the runner"
+        description: "Bun projects: install the packageManager Bun, then bun install --frozen-lockfile (contract: file header)"
         type: boolean
         default: false
       secret-scan:
@@ -222,7 +223,7 @@ jobs:
           echo "GIT_CONFIG_COUNT=${n}" >> "$GITHUB_ENV"
       # Node preset: the same toolchain on hosted and self-hosted runners, whatever the
       # runner image ships. npm ci here keeps project stubs to plain script names.
-      # bun: true turns the npm cache off (it keys on package-lock.json) and swaps npm ci for Install — Bun.
+      # bun: true turns the npm cache off: it keys on package-lock.json.
       - uses: actions/setup-node@v4
         if: steps.tip.outputs.skip != 'true' && inputs.node-version != ''
         with:
@@ -231,12 +232,11 @@ jobs:
       - name: Install
         if: steps.tip.outputs.skip != 'true' && inputs.node-version != '' && !inputs.bun
         run: npm ci
-      # Bun preset: explicit only, never guessed from lockfiles. The version comes from packageManager
-      # (any +sha suffix dropped), installed through npm into $RUNNER_TEMP, so no runner image needs Bun.
+      # Bun preset: contract in the file header (Bun project stub).
       - name: Install — Bun
         if: steps.tip.outputs.skip != 'true' && inputs.bun
         run: |
-          command -v npm >/dev/null || { echo "::error::bun: true needs node/npm on the runner (or pass node-version)"; exit 1; }
+          { command -v node && command -v npm; } >/dev/null || { echo "::error::bun: true needs node/npm on the runner (or pass node-version)"; exit 1; }
           [ -f package.json ] || { echo "::error::bun: true but no package.json at the repo root"; exit 1; }
           pm=$(node -p "require('./package.json').packageManager || ''")
           ver="${pm%%+*}"; ver="${ver#bun@}"

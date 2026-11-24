@@ -88,7 +88,42 @@
     "typescript/no-wrapper-object-types": "error",
     "typescript/prefer-as-const": "error",
     "typescript/prefer-namespace-keyword": "error",
-    "typescript/triple-slash-reference": "error"
+    "typescript/triple-slash-reference": "error",
+    "id-length": [
+      "error",
+      {
+        "min": 3,
+        "exceptions": [
+          "id",
+          "i",
+          "j",
+          "k",
+          "x",
+          "y",
+          "w",
+          "h"
+        ]
+      }
+    ],
+    "id-denylist": [
+      "error",
+      "data",
+      "tmp",
+      "temp",
+      "obj",
+      "info",
+      "result",
+      "res",
+      "ret",
+      "val",
+      "foo",
+      "bar",
+      "item",
+      "list",
+      "str",
+      "arr",
+      "dict"
+    ]
   },
   "overrides": [
     {
@@ -104,19 +139,29 @@
     },
     {
       "files": [
-        "tests/**/*.{ts,tsx}"
-      ],
-      "rules": {
-        "no-unused-vars": "off",
-        "typescript/no-explicit-any": "off"
-      }
-    },
-    {
-      "files": [
         "tailwind.config.ts"
       ],
       "rules": {
         "typescript/no-require-imports": "off"
+      }
+    },
+    {
+      "files": [
+        "app/protected/page.tsx",
+        "components/auth-button.tsx",
+        "components/forgot-password-form.tsx",
+        "components/login-form.tsx",
+        "components/sign-up-form.tsx",
+        "components/theme-switcher.tsx",
+        "components/ui/button.tsx",
+        "components/update-password-form.tsx",
+        "lib/supabase/proxy.ts",
+        "lib/utils.ts",
+        "tailwind.config.ts"
+      ],
+      "rules": {
+        "id-length": "off",
+        "id-denylist": "off"
       }
     }
   ]
