@@ -38,6 +38,14 @@
 #         lint: npm run lint && npm run typecheck
 #         build: npm run build
 #         test: npm test
+#
+# Bun project stub: pass bun: true and plain script names; node-version is not needed
+# (the runner's own node/npm installs Bun). The Bun version is the packageManager field
+# of package.json (bun@<version>), installed into $RUNNER_TEMP, then bun install --frozen-lockfile.
+#         bun: true
+#         lint: npm run lint && npm run typecheck
+#         build: npm run build
+#         test: npm test
 name: Quality
 
 on:
@@ -60,9 +68,13 @@ on:
         type: string
         default: '"ubuntu-latest"'
       node-version:
-        description: "Node projects: major version to install (e.g. \"22\"), then npm ci before lint. Empty = skip"
+        description: "Node projects: major version to install (e.g. \"22\"), then npm ci before lint (bun: true replaces npm ci). Empty = skip"
         type: string
         default: ""
+      bun:
+        description: "Bun projects: install Bun at package.json's packageManager version, then bun install --frozen-lockfile before lint. Independent of node-version; needs node/npm on the runner"
+        type: boolean
+        default: false
       secret-scan:
         description: "Pull requests: gitleaks over the PR's commits (base.sha..head.sha). false = skip"
         type: boolean
@@ -210,14 +222,36 @@ jobs:
           echo "GIT_CONFIG_COUNT=${n}" >> "$GITHUB_ENV"
       # Node preset: the same toolchain on hosted and self-hosted runners, whatever the
       # runner image ships. npm ci here keeps project stubs to plain script names.
+      # bun: true turns the npm cache off (it keys on package-lock.json) and swaps npm ci for Install — Bun.
       - uses: actions/setup-node@v4
         if: steps.tip.outputs.skip != 'true' && inputs.node-version != ''
         with:
           node-version: ${{ inputs.node-version }}
-          cache: npm
+          cache: ${{ !inputs.bun && 'npm' || '' }}
       - name: Install
-        if: steps.tip.outputs.skip != 'true' && inputs.node-version != ''
+        if: steps.tip.outputs.skip != 'true' && inputs.node-version != '' && !inputs.bun
         run: npm ci
+      # Bun preset: explicit only, never guessed from lockfiles. The version comes from packageManager
+      # (any +sha suffix dropped), installed through npm into $RUNNER_TEMP, so no runner image needs Bun.
+      - name: Install — Bun
+        if: steps.tip.outputs.skip != 'true' && inputs.bun
+        run: |
+          command -v npm >/dev/null || { echo "::error::bun: true needs node/npm on the runner (or pass node-version)"; exit 1; }
+          [ -f package.json ] || { echo "::error::bun: true but no package.json at the repo root"; exit 1; }
+          pm=$(node -p "require('./package.json').packageManager || ''")
+          ver="${pm%%+*}"; ver="${ver#bun@}"
+          case "$pm" in
+            bun@[0-9]*) ;;
+            *) echo "::error::bun: true needs packageManager \"bun@<version>\" in package.json (got \"${pm}\")"; exit 1 ;;
+          esac
+          npm i --prefix "$RUNNER_TEMP/bun" --no-audit --no-fund "bun@${ver}"
+          bin="$RUNNER_TEMP/bun/node_modules/.bin"
+          got=$("$bin/bun" --version)
+          echo "packageManager: ${pm} → bun ${got}"
+          [ "$got" = "$ver" ] || { echo "::error::installed bun ${got}, packageManager asks for ${ver}"; exit 1; }
+          echo "$bin" >> "$GITHUB_PATH"
+          echo "bun install --frozen-lockfile"
+          "$bin/bun" install --frozen-lockfile
       # Lint before build: cheapest check first. CI_BASE_REF lets the project's lint
       # command diff against the PR target, so legacy code is never retro-flagged.
       - name: Lint
