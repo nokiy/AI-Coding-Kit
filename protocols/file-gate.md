@@ -92,7 +92,7 @@ or fails, the line is omitted and the block still stands.
 
 Names inside files (variables, functions) are not judged by the gate; each language's linter does
 it in CI's Lint step, configured from [`configs/`](../configs): `swiftlint-naming.yml`,
-`eslint-naming.json`.
+`eslint-naming.json`, `js-default/oxlintrc.json`.
 
 ## Portability
 
