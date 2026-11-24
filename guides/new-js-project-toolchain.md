@@ -93,9 +93,9 @@ Use `npm run <script>`, never `npm install` / `npm ci`: npm would write a `packa
 
 完成标准：没有 `eslint.config.*` / `.eslintrc*`，`package.json` 里没有 `eslint`，没有 `package-lock.json`，只有 `bun.lock`，`npm run fmt:check` 退出 0。脚本用 `npm run <script>` 跑，NEVER `npm install` / `npm ci`：npm 会写出 `package-lock.json`。
 
-CI: in the project's stub of [`quality.yml`](../.github/workflows/quality.yml) set `bun: true` (the gate installs the `packageManager` Bun and runs `bun install --frozen-lockfile`) and `lint: npm run lint && npm run typecheck`; a project with a `fmt:check` script sets `lint: npm run fmt:check && npm run lint && npm run typecheck`.
+<a id="ci"></a>CI: in the project's stub of [`quality.yml`](../.github/workflows/quality.yml) set `bun: true` (the gate installs the `packageManager` Bun and runs `bun install --frozen-lockfile`) and `lint: npm run fmt:check && npm run lint && npm run typecheck`. A project without a `fmt:check` script (a converted existing project) sets `lint: npm run lint && npm run typecheck`.
 
-CI：项目的 [`quality.yml`](../.github/workflows/quality.yml) 存根里设 `bun: true`（中央门按 `packageManager` 装 Bun，再跑 `bun install --frozen-lockfile`），并设 `lint: npm run lint && npm run typecheck`；有 `fmt:check` 脚本的项目设 `lint: npm run fmt:check && npm run lint && npm run typecheck`。
+CI：项目的 [`quality.yml`](../.github/workflows/quality.yml) 存根里设 `bun: true`（中央门按 `packageManager` 装 Bun，再跑 `bun install --frozen-lockfile`），并设 `lint: npm run fmt:check && npm run lint && npm run typecheck`。没有 `fmt:check` 脚本的项目（转换过来的已有项目）设 `lint: npm run lint && npm run typecheck`。
 
 ## Convert an existing project / 转换已有项目
 
@@ -106,13 +106,13 @@ Run the fresh-scaffold steps without Oxfmt: skip the `oxfmtrc.json` copy in step
 To format an existing project later, take its own route:
 
 1. Clear the file-gate debt first ([`protocols/file-gate.md`](../protocols/file-gate.md): over-long files, over-long lines), so formatting does not push files over the limits.
-2. Add Oxfmt (`oxfmtrc.json` + `fmt-snippet.json`, then reinstall: steps 2–4), append the project's own generated or vendored directories to `ignorePatterns`, run `npm run fmt`, and land it as one PR that only formats.
+2. Add Oxfmt: copy only `oxfmtrc.json` to `.oxfmtrc.json`; run step 3's merge script with only `fmt-snippet.json`; reinstall as in step 4. Append the project's own generated or vendored directories to `ignorePatterns`, run `npm run fmt`, and land it as one PR that only formats. Its CI `lint` then gains `npm run fmt:check` (see [CI](#ci)).
 3. After it is squash-merged, add that commit's hash to `.git-blame-ignore-revs`; each clone runs `git config blame.ignoreRevsFile ':(optional).git-blame-ignore-revs'` once.
 
 已有项目要排版，单独走一条路：
 
 1. 先还 file-gate 旧债（[`protocols/file-gate.md`](../protocols/file-gate.md)：超长文件、超长行），免得排版把文件推过上限。
-2. 加 Oxfmt（`oxfmtrc.json` + `fmt-snippet.json`，再重装：同第 2–4 步），把项目自己的生成目录、第三方目录追加进 `ignorePatterns`，跑 `npm run fmt`，作为一个只排版的 PR 合进去。
+2. 加 Oxfmt：只把 `oxfmtrc.json` 拷成 `.oxfmtrc.json`；第 3 步的合并脚本只传 `fmt-snippet.json`；照第 4 步重装。把项目自己的生成目录、第三方目录追加进 `ignorePatterns`，跑 `npm run fmt`，作为一个只排版的 PR 合进去。之后它的 CI `lint` 加上 `npm run fmt:check`（见 [CI](#ci)）。
 3. squash 合并后，把那次提交的哈希登记进 `.git-blame-ignore-revs`；每个克隆跑一次 `git config blame.ignoreRevsFile ':(optional).git-blame-ignore-revs'`。
 
 ## Upgrade rule / 升级规则
