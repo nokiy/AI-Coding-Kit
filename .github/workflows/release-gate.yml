@@ -1,0 +1,57 @@
+# Reusable release gate: show the nightly full-suite result on the open release PR, never run the suite.
+# Copies the full-suite commit status of the base branch HEAD (written by full-suite.yml) onto the head of every
+# open release-please PR ("autorelease: pending") as the status release-gate: success · failure · pending
+# (not tested yet: the 「发版」 step runs it). full-suite.yml refreshes it on its own when it tests the base HEAD.
+# The 「发版」 merge step is scripts/project/release-gate-check.sh check <pr> (run by the session, its header).
+#
+# Caller: the project's release-please workflow, as a job after release-please (QB: after the tidy push too, so
+# the status lands on the final head), skipped when a release was just created; the caller grants these permissions:
+#   permissions:
+#     contents: write          # release-please's own
+#     pull-requests: write     # release-please's own
+#     statuses: write
+#   jobs:
+#     release-please: ...
+#     gate:
+#       needs: release-please
+#       if: needs.release-please.outputs.released != 'true'
+#       uses: nokiy/AI-Coding-Kit/.github/workflows/release-gate.yml@master
+name: Release gate
+
+on:
+  workflow_call:
+    inputs:
+      branch:
+        description: "Base branch of the release PR (empty = the repo's default branch)"
+        type: string
+        default: ""
+      runner:
+        description: 'Runner as JSON text, e.g. "ubuntu-latest" or ["self-hosted","local-mac"]'
+        type: string
+        default: '"ubuntu-latest"'
+
+jobs:
+  release-gate:
+    runs-on: ${{ fromJSON(inputs.runner) }}
+    timeout-minutes: 5
+    steps:
+      # The kit at this workflow's own commit, moved out of the workspace (same pattern as full-suite.yml).
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .ci-kit
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/project
+            scripts/full-suite
+      - name: Kit — move out of workspace
+        run: |
+          rm -rf "$RUNNER_TEMP/ci-kit"
+          mv .ci-kit "$RUNNER_TEMP/ci-kit"
+      - name: Copy full-suite onto the release PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: ${{ inputs.branch }}
+        run: '"$RUNNER_TEMP/ci-kit/scripts/project/release-gate-check.sh" sync'
