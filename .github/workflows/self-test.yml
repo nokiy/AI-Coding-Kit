@@ -1,7 +1,8 @@
 # Kit self-test: every PR into master runs the reusable quality gate against this repo,
 # so the File gate step judges the PR's own files, the Secret scan steps scan the PR's own
 # commits (clean path), and the test scripts prove file-gate.sh and secret-scan.sh on Linux
-# (default runner ubuntu-latest) — secret-scan's test.sh asserts the leak path goes red.
+# (default runner ubuntu-latest) — secret-scan's test.sh asserts the leak path goes red — and
+# full-suite's test.sh proves the nightly flow's GitHub calls against a fake gh.
 name: Self-test
 
 on:
@@ -12,4 +13,4 @@ jobs:
   quality:
     uses: ./.github/workflows/quality.yml
     with:
-      test: ./scripts/file-gate/test.sh && ./scripts/secret-scan/test.sh
+      test: ./scripts/file-gate/test.sh && ./scripts/secret-scan/test.sh && ./scripts/full-suite/test.sh

@@ -1,0 +1,214 @@
+# Reusable full suite — the central nightly flow. Project stubs give the time, the commands and the runner;
+# every judgement lives here and in scripts/full-suite/full-suite.sh (its header lists what each verdict does).
+#
+# Flow: resolve ref → commit sha. That commit already has a final full-suite status (success or failure)
+# → exit green in seconds without testing (force: true tests anyway). Otherwise mark it pending, build once,
+# run the whole test command; a red test run is rerun once (a red build is not):
+#   pass → status success · fail then pass → success marked 偶发 · fail twice → status failure, job red.
+# issue-filer central: red opens a nightly-red issue (or comments on the open one) with the failing log tail and
+# the PRs merged since the last green full-suite; a flaky pass comments on the ci-health 全量偶发记录 issue.
+# issue-filer external (a reviewer agent files issues): status only. Any later trigger on that red commit (the
+# skip path) opens a nightly-red issue marked 未经评审 once the commit has been red for review-window minutes
+# with no nightly-red issue open, so the stub needs a trigger that fires after the window.
+# Either filer: a green run closes open nightly-red issues with 「已恢复」.
+# Outputs: result = skipped | green | flaky | red, sha = the commit tested.
+# Runner: the runner input only — never vars.CI_RUNNER, which routes PR CI. The runner needs bash and gh.
+#
+# Caller stub (project .github/workflows/full-suite.yml); the caller grants these permissions:
+#   name: Full suite
+#   on:
+#     schedule:
+#       - cron: "0 21 * * *"          # 05:00 Asia/Taipei
+#     workflow_dispatch:
+#       inputs:
+#         ref: { description: "Branch, tag or sha (empty = default branch)", default: "" }
+#         force: { description: "Test even if this commit was tested", type: boolean, default: false }
+#   permissions:
+#     contents: read
+#     statuses: write
+#     issues: write
+#     pull-requests: read
+#   jobs:
+#     full:
+#       uses: nokiy/AI-Coding-Kit/.github/workflows/full-suite.yml@master
+#       with:
+#         build: ./dev.sh build
+#         test: ./swift-test.sh
+#         runner: '["self-hosted","local-mac"]'
+#         issue-filer: external
+#         ref: ${{ inputs.ref || '' }}
+#         force: ${{ inputs.force || false }}
+# Private dependencies: private-deps + secret deps-token, the same contract as quality.yml.
+name: Full suite
+
+on:
+  workflow_call:
+    inputs:
+      build:
+        description: "Build command, the way the project ships (empty = skip)"
+        type: string
+        default: ""
+      test:
+        description: "Full test command; rerun once as a whole when it fails"
+        type: string
+        required: true
+      runner:
+        description: 'Runner as JSON text, e.g. "ubuntu-latest" or ["self-hosted","local-mac"]'
+        type: string
+        default: '"ubuntu-latest"'
+      ref:
+        description: "Branch, tag or sha to test (empty = the repo's default branch)"
+        type: string
+        default: ""
+      force:
+        description: "Test even when the commit already has a final full-suite status"
+        type: boolean
+        default: false
+      issue-filer:
+        description: "central = this workflow opens / comments / closes issues; external = a reviewer agent does"
+        type: string
+        default: central
+      review-window:
+        description: "external: minutes a red commit waits for a reviewed nightly-red issue before the backstop"
+        type: number
+        default: 120
+      timeout-minutes:
+        description: "Job timeout"
+        type: number
+        default: 90
+      private-deps:
+        description: "Space-separated https://github.com/ URL prefixes fetched with secret deps-token (empty = skip)"
+        type: string
+        default: ""
+    secrets:
+      deps-token:
+        description: "Read-only token for the private-deps URLs"
+        required: false
+    outputs:
+      result:
+        description: "skipped | green | flaky | red"
+        value: ${{ jobs.full-suite.outputs.result }}
+      sha:
+        description: "The commit tested (or skipped)"
+        value: ${{ jobs.full-suite.outputs.sha }}
+
+jobs:
+  full-suite:
+    runs-on: ${{ fromJSON(inputs.runner) }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    # Two triggers for one ref (the reviewer agent and the cron backstop) queue; the second then skips.
+    concurrency:
+      group: full-suite-${{ github.repository }}-${{ inputs.ref || 'default' }}
+      cancel-in-progress: false
+    outputs:
+      result: ${{ steps.verdict.outputs.result }}
+      sha: ${{ steps.target.outputs.sha }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      FILER: ${{ inputs.issue-filer }}
+      WINDOW_MIN: ${{ inputs.review-window }}
+    steps:
+      # The kit at this workflow's own commit, moved out of the workspace (same pattern as quality.yml).
+      - name: Kit — locate
+        env:
+          KIT_REPO: ${{ job.workflow_repository }}
+          KIT_SHA: ${{ job.workflow_sha }}
+        run: |
+          if [ -z "$KIT_REPO" ] || [ -z "$KIT_SHA" ]; then
+            echo "::error::job.workflow_repository / job.workflow_sha empty — cannot locate the kit"
+            exit 1
+          fi
+          echo "kit from ${KIT_REPO}@${KIT_SHA}"
+          echo "FS=$RUNNER_TEMP/ci-kit/scripts/full-suite/full-suite.sh" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .ci-kit
+          persist-credentials: false
+          sparse-checkout: scripts/full-suite
+      - name: Kit — move out of workspace
+        run: |
+          rm -rf "$RUNNER_TEMP/ci-kit"
+          mv .ci-kit "$RUNNER_TEMP/ci-kit"
+      - name: Tested already?
+        id: target
+        env:
+          REF: ${{ inputs.ref }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          [ -n "$REF" ] || REF=$(gh api "repos/$GH_REPO" --jq .default_branch)
+          sha=$(gh api "repos/$GH_REPO/commits/$REF" --jq .sha)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "SHA=$sha" >> "$GITHUB_ENV"
+          export SHA=$sha
+          seen=$("$FS" seen)
+          echo "$REF → $sha · $seen"
+          case "$seen" in
+            state=success*|state=failure*)
+              if [ "$FORCE" != true ]; then
+                echo "skip=true" >> "$GITHUB_OUTPUT"
+                echo "Full suite skipped: $sha already tested (${seen})." >> "$GITHUB_STEP_SUMMARY"
+                "$FS" backstop
+              fi ;;
+          esac
+      - name: Mark pending
+        if: steps.target.outputs.skip != 'true'
+        run: '"$FS" mark pending "全量进行中"'
+      - uses: actions/checkout@v4
+        if: steps.target.outputs.skip != 'true'
+        with:
+          ref: ${{ steps.target.outputs.sha }}
+      - name: Private deps — credentials
+        if: steps.target.outputs.skip != 'true' && inputs.private-deps != ''
+        env:
+          DEPS_TOKEN: ${{ secrets.deps-token }}
+          PRIVATE_DEPS: ${{ inputs.private-deps }}
+        run: |
+          if [ -z "$DEPS_TOKEN" ]; then
+            echo "::warning::private-deps is set but secret deps-token is empty: ${PRIVATE_DEPS}"
+            exit 0
+          fi
+          echo "::add-mask::${DEPS_TOKEN}"
+          n=${GIT_CONFIG_COUNT:-0}
+          for prefix in $PRIVATE_DEPS; do
+            case "$prefix" in
+              https://github.com/?*) ;;
+              *) echo "::error::private-deps: ${prefix} is not an https://github.com/ URL"; exit 1 ;;
+            esac
+            {
+              echo "GIT_CONFIG_KEY_${n}=url.https://x-access-token:${DEPS_TOKEN}@${prefix#https://}.insteadOf"
+              echo "GIT_CONFIG_VALUE_${n}=${prefix}"
+            } >> "$GITHUB_ENV"
+            n=$((n + 1))
+          done
+          echo "GIT_CONFIG_COUNT=${n}" >> "$GITHUB_ENV"
+      # Never fails on its own: the verdict decides, after the status and issues are written.
+      - name: Build and test
+        id: run
+        if: steps.target.outputs.skip != 'true'
+        env:
+          BUILD_CMD: ${{ inputs.build }}
+          TEST_CMD: ${{ inputs.test }}
+        run: |
+          "$FS" run | tee "$RUNNER_TEMP/full-suite-run.out"
+          grep '^verdict=' "$RUNNER_TEMP/full-suite-run.out" | tail -n1 >> "$GITHUB_OUTPUT"
+      - name: Status and issues
+        if: steps.run.outputs.verdict != ''
+        env:
+          VERDICT: ${{ steps.run.outputs.verdict }}
+        run: '"$FS" report "$VERDICT"'
+      - name: Verdict
+        id: verdict
+        if: always()
+        env:
+          SKIP: ${{ steps.target.outputs.skip }}
+          VERDICT: ${{ steps.run.outputs.verdict }}
+        run: |
+          result=${VERDICT:-none}
+          [ "$SKIP" = true ] && result=skipped
+          echo "result=$result" >> "$GITHUB_OUTPUT"
+          echo "Full suite: ${result} on ${SHA:-?}" >> "$GITHUB_STEP_SUMMARY"
+          case "$result" in skipped|green|flaky) exit 0 ;; *) exit 1 ;; esac
