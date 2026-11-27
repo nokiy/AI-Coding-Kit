@@ -14,7 +14,7 @@ cat > "$T/bin/gh" <<'GH'
 echo "gh $*" >> "$FX/calls"
 args="$*"
 case "$args" in
-  *"issue create"*|*"issue comment"*) [ -t 0 ] || cat >> "$FX/calls" ;;
+  *"--body-file -"*) cat >> "$FX/calls" ;;
 esac
 case "$args" in
   "api repos/"*"/statuses?"*'.state //'*) cat "$FX/state" 2>/dev/null ;;
