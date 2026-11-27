@@ -28,6 +28,8 @@ esac
 exit 0
 GH
 chmod +x "$T/bin/gh"
+# The caller's own helper variables (e.g. this test run inside a full-suite build) must not leak into the cases.
+unset BUILD_CMD TEST_CMD FILER WINDOW_MIN TAIL_LINES SUSPECT_DEPTH
 export PATH="$T/bin:$PATH" FX="$T/fx" GH_REPO=o/r SHA=abc1234def RUN_URL=https://run/1 LOG_DIR="$T/logs"
 
 pass=0; fail=0; OUT="$T/out"; CODE=0
