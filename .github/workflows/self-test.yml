@@ -3,7 +3,7 @@
 # commits (clean path), and the test scripts prove file-gate.sh and secret-scan.sh on Linux
 # (default runner ubuntu-latest) — secret-scan's test.sh asserts the leak path goes red — and
 # full-suite's test.sh and release-gate-check.test.sh prove the nightly flow's and the release gate's GitHub calls
-# against a fake gh.
+# against a fake gh; prompts' test.sh proves the prompt renders and that prompts/rendered/ is fresh.
 name: Self-test
 
 on:
@@ -14,4 +14,4 @@ jobs:
   quality:
     uses: ./.github/workflows/quality.yml
     with:
-      test: ./scripts/file-gate/test.sh && ./scripts/secret-scan/test.sh && ./scripts/full-suite/test.sh && ./scripts/project/release-gate-check.test.sh
+      test: ./scripts/file-gate/test.sh && ./scripts/secret-scan/test.sh && ./scripts/full-suite/test.sh && ./scripts/project/release-gate-check.test.sh && ./scripts/prompts/test.sh

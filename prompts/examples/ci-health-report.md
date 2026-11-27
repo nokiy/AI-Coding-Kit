@@ -25,4 +25,4 @@
 | 3 | 变慢 | PR CI 正常耗时 3 分 47 秒，上一份 3 分 05 秒（+23%） | 本表 ci.yml 一行 | `gh run list -R nokiy/quota-bar --workflow ci.yml --limit 20 --json databaseId,startedAt,updatedAt`；看 `Test` 步耗时 |
 
 ## 修复进度
-- #1150 夜间全量红：UsageAggregateTests.crossMidnight__F41 → 还没有 PR（早上 07:30 修复任务处理）
+- #1150 夜间全量红：UsageAggregateTests.crossMidnight__F41 → 还没有 PR（早上 09:00 修复任务处理）

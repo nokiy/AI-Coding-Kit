@@ -1,31 +1,35 @@
 #!/usr/bin/env bash
 # Render one prompt template with one project's config (prompts/README.md).
-# Usage: scripts/prompts/render.sh <project config.md> <template.md>   → the prompt on stdout
+# Usage: scripts/prompts/render.sh <project config.md> [<variant config.md> ...] <template.md>   → the prompt on stdout
 # Config: each line "## <key>" (key = a-z, 0-9, _) opens a value that runs to the next "## " line or the end;
 #   text before the first key is a note and ignored; blank lines around a value are trimmed.
+#   Configs are read in order: a key in a later one (a variant, prompts/projects/variants/) replaces the earlier value.
 # Template: every {{key}} is replaced by that key's value, as many lines as the value has.
 # Exit: 0 rendered · 1 the template names a key the config lacks (each one named on stderr) · 2 usage
 
-[ $# = 2 ] || { echo "usage: render.sh <project config.md> <template.md>" >&2; exit 2; }
-for f in "$1" "$2"; do [ -f "$f" ] || { echo "render: no such file: $f" >&2; exit 2; }; done
-
-awk -v CFG="$1" '
+[ $# -ge 2 ] || { echo "usage: render.sh <project config.md> [<variant config.md> ...] <template.md>" >&2; exit 2; }
+for f in "$@"; do [ -f "$f" ] || { echo "render: no such file: $f" >&2; exit 2; }; done
+awk -v NCFG=$(($# - 1)) '
 function trim(v) {
   while (substr(v, 1, 1) == "\n") v = substr(v, 2)
   while (length(v) && substr(v, length(v), 1) == "\n") v = substr(v, 1, length(v) - 1)
   return v
 }
 BEGIN {
-  key = ""
-  while ((getline line < CFG) > 0) {
-    if (line ~ /^## [a-z0-9_]+[ \t]*$/) {
-      key = line; sub(/^## /, "", key); sub(/[ \t]+$/, "", key); have[key] = 1; val[key] = ""
-      continue
+  # ARGV[1..NCFG] are the configs, read here; deleting them leaves the template as the only input
+  for (i = 1; i <= NCFG; i++) {
+    f = ARGV[i]; delete ARGV[i]
+    key = ""
+    while ((getline line < f) > 0) {
+      if (line ~ /^## [a-z0-9_]+[ \t]*$/) {
+        key = line; sub(/^## /, "", key); sub(/[ \t]+$/, "", key); have[key] = 1; val[key] = ""
+        continue
+      }
+      if (line ~ /^## /) { key = ""; continue }
+      if (key != "") val[key] = val[key] "\n" line
     }
-    if (line ~ /^## /) { key = ""; continue }
-    if (key != "") val[key] = val[key] "\n" line
+    close(f)
   }
-  close(CFG)
   for (k in have) val[k] = trim(val[k])
 }
 {
@@ -41,4 +45,4 @@ BEGIN {
 END {
   for (k in missing) print "render: config has no key " k > "/dev/stderr"
   exit bad ? 1 : 0
-}' "$2"
+}' "$@"

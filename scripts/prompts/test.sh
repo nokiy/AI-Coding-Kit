@@ -38,6 +38,13 @@ printf 'a {{three}} {{one}}\n' > "$T/tpl2.md"
 if [ "$c" = 1 ] && grep -q 'no key three' "$T/e"; then ok "missing key → exit 1, named"
 else no "missing key → exit 1, named" "exit $c"; fi
 
+printf '## two\nC\n## three\nD\n' > "$T/var.md"
+printf '{{one}} {{two}} {{three}}\n' > "$T/tpl3.md"
+"$SH" "$RENDER" "$T/cfg.md" "$T/var.md" "$T/tpl3.md" > "$T/o" 2>&1; c=$?
+printf 'first\nsecond C D\n' > "$T/want"
+if [ "$c" = 0 ] && cmp -s "$T/o" "$T/want"; then ok "variant config: later key replaces, others kept"
+else no "variant config: later key replaces, others kept" "exit $c: $(tr '\n' '|' < "$T/o")"; fi
+
 # --- row 1: both projects render both templates, differing only by config ---
 projects="quota-bar infinite-canvas"
 for proj in $projects; do
@@ -56,6 +63,22 @@ for proj in $projects; do
   if cmp -s "$T/used" "$T/k-$proj"; then ok "row 1: $proj config keys = template keys"
   else no "row 1: $proj config keys = template keys" "$(diff "$T/used" "$T/k-$proj" | tr '\n' ' ')"; fi
 done
+
+# --- Kit#32: variants only replace keys the project has; prompts/rendered/ is a fresh render ---
+for v in "$P"/projects/variants/*.md; do
+  base="$P/projects/$(basename "$v" .md | sed 's/-[a-z]*$//').md"
+  keys_of_config "$base" > "$T/base-keys"
+  extra=$(keys_of_config "$v" | grep -vxF -f "$T/base-keys")
+  if [ -f "$base" ] && [ -z "$extra" ]; then ok "variant $(basename "$v"): keys all in $(basename "$base")"
+  else no "variant $(basename "$v"): keys all in $(basename "$base")" "base $base, extra: $extra"; fi
+done
+"$SH" "$HERE/render-all.sh" "$T/rendered" 2> "$T/e"; c=$?
+if [ "$c" = 0 ] && diff -r "$T/rendered" "$P/rendered" > "$T/d"; then ok "prompts/rendered/ = fresh render-all.sh output"
+else no "prompts/rendered/ = fresh render-all.sh output" "exit $c; run scripts/prompts/render-all.sh: $(head -n3 "$T/d" | tr '\n' ' ')"; fi
+m="$P/rendered/infinite-canvas-morning-local.md"
+if [ -s "$m" ] && ! grep -Eq 'gh pr merge|/merge|-X PUT|push --force|push -f|--force-with-lease|/reviews' "$m"; then
+  ok "row 3: infinite-canvas local morning never merges or force-pushes"
+else no "row 3: infinite-canvas local morning never merges or force-pushes"; fi
 
 # --- row 3: permissions ---
 forbid_night='gh pr merge|gh pr close|gh pr review|gh run rerun|gh issue close|gh issue delete'

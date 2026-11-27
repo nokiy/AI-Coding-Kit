@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Render every prompt the projects run into prompts/rendered/ (prompts/SETUP.md says where each one is pasted).
+# Usage: scripts/prompts/render-all.sh [<out dir>]   (default prompts/rendered; scripts/prompts/test.sh renders into a temp
+#   dir and compares, so a template or config change without a fresh render goes red)
+# Exit: 0 all rendered · 1 a render failed (named on stderr)
+
+HERE=$(cd "$(dirname "$0")" && pwd)
+P=$(cd "$HERE/../../prompts" && pwd)
+OUT=${1:-$P/rendered}
+mkdir -p "$OUT" || exit 1
+bad=0
+
+r() { # <out file> <config> [<variant>] <template>
+  out=$1; shift
+  "${BASH:-bash}" "$HERE/render.sh" "$@" > "$OUT/$out" || { echo "render-all: $out failed" >&2; bad=1; }
+}
+
+r quota-bar-nightly.md "$P/projects/quota-bar.md" "$P/nightly.md"
+r quota-bar-morning.md "$P/projects/quota-bar.md" "$P/morning.md"
+r infinite-canvas-nightly.md "$P/projects/infinite-canvas.md" "$P/nightly.md"
+r infinite-canvas-morning.md "$P/projects/infinite-canvas.md" "$P/morning.md"
+r infinite-canvas-morning-local.md "$P/projects/infinite-canvas.md" "$P/projects/variants/infinite-canvas-local.md" "$P/morning.md"
+
+exit $bad

@@ -48,7 +48,7 @@ Swift 用 `./swift-test.sh F-<编号>`，Go 用 `./GatewayCore/go-test.sh F-<编
 `beta.yml`、`release-please.yml`
 
 ## morning_runner
-你跑在我 Mac 上的 Claude Code 桌面定时任务里，工作目录 `/Users/niko/AI_Workspace/AI_Coding/Apps/quota-bar`，每天 07:30（台湾时间）。Mac 睡着错过了，醒来会补跑一次：补跑时照常做，不用管时间。
+你跑在我 Mac 上的 Claude Code 桌面定时任务里，工作目录 `/Users/niko/AI_Workspace/AI_Coding/Apps/quota-bar`，每天 09:00（台湾时间）。Mac 睡着错过了，醒来会补跑一次：补跑时照常做，不用管时间。
 
 ## gh_note
 本机 `gh` 已登录。
