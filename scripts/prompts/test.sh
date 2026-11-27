@@ -58,7 +58,10 @@ for proj in $projects; do
 done
 
 # --- row 3: permissions ---
-forbid_night='gh pr merge|gh pr close|gh pr review|gh run rerun|gh issue close|gh issue delete|gh repo|gh secret|gh variable|gh release|git push|git commit|git checkout|git switch|git branch|git worktree|-X (POST|PATCH|PUT|DELETE)|--method'
+forbid_night='gh pr merge|gh pr close|gh pr review|gh run rerun|gh issue close|gh issue delete'
+forbid_night="$forbid_night|gh repo|gh secret|gh variable|gh release"
+forbid_night="$forbid_night|git push|git commit|git checkout|git switch|git branch|git worktree"
+forbid_night="$forbid_night|-X (POST|PATCH|PUT|DELETE)|--method"
 for proj in $projects; do
   allow="$T/allow-$proj"
   section "$T/$proj-nightly.md" "### 允许的命令" > "$allow"
