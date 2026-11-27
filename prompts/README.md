@@ -45,7 +45,7 @@ scripts/prompts/test.sh                                                       # 
 ## 和中央全量的约定
 
 - 全量工作流是 `.github/workflows/full-suite.yml`：测试失败时整条重跑一次，结果写成提交状态 `full-suite`（「全量通过」/「全量通过（偶发：重跑后通过）」/「全量失败」），同一提交已有结果就秒退跳过。所以夜间提示词不许重跑运行。
-- 两个项目都设 `issue-filer: external`：中央红了只写状态，由夜间值班开 issue。中央兜底：红了 `review-window`（默认 120 分钟）还没有打开的 `nightly-red`，**下一次触发时**中央开「全量失败（未经评审）」。没有 GitHub 定时兜底，所以下一次触发通常是第二天夜里：一晚没评审，红灯最晚第二天夜里有 issue。这是有意接受的延迟。
+- 两个项目都设 `issue-filer: external`：中央红了只写状态，由夜间值班开 issue。中央兜底：默认分支上红了 `review-window`（默认 120 分钟）的提交，若没有哪张打开的 `nightly-red` 提到它（提交 sha 前 7 位），**下一次触发时**（不管那次测哪个提交）中央开「全量失败（未经评审）」，已有打开的就追加评论。没有 GitHub 定时兜底，所以下一次触发通常是第二天夜里：一晚没评审，红灯最晚第二天夜里有 issue。这是有意接受的延迟。
 - 每仓最多一张打开的 `nightly-red`；全量重新跑绿时中央评论「已恢复」并关掉它。所以修复 PR 写 `Refs #N`，不写 `Closes`。
 - `release-please--*` 分支上 `action_required` 的运行是预期（GITHUB_TOKEN 开的发版 PR，GitHub 等批准，Kit#26）：不算红、不开 issue、不计入成功率，日报只记条数。
 - 标签：`nightly-red` = 确认是回归，早晨修；`ci-health` = 偶发、变慢、白跑，只记录，加上 `nightly-red` 才进早晨修复；`awaiting-observation` = 合并后要隔几天才看得到的验收行。

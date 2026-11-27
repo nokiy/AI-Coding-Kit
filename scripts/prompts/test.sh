@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Self-test for render.sh and the prompt templates in prompts/ (Kit#29 acceptance rows 1-3).
+# Self-test for render.sh and the prompt templates in prompts/: both projects render, keep the report and issue formats,
+# and stay inside their permissions.
 # Usage: scripts/prompts/test.sh   (macOS /bin/bash 3.2 or Linux bash; needs awk, grep, sed)
 # Prints one line per case and a summary; exits non-zero when any case fails.
 
@@ -64,7 +65,7 @@ for proj in $projects; do
   else no "row 1: $proj config keys = template keys" "$(diff "$T/used" "$T/k-$proj" | tr '\n' ' ')"; fi
 done
 
-# --- Kit#32: variants only replace keys the project has; prompts/rendered/ is a fresh render ---
+# --- variants only replace keys the project has; prompts/rendered/ is a fresh render ---
 for v in "$P"/projects/variants/*.md; do
   base="$P/projects/$(basename "$v" .md | sed 's/-[a-z]*$//').md"
   keys_of_config "$base" > "$T/base-keys"

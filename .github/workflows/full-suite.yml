@@ -1,27 +1,17 @@
-# Reusable full suite — the central nightly flow. Project stubs give the time, the commands and the runner;
-# every judgement lives here and in scripts/full-suite/full-suite.sh (its header lists what each verdict does).
-#
-# Flow: resolve ref → commit sha. That commit already has a final full-suite status (success or failure)
-# → exit green in seconds without testing (force: true tests anyway). Otherwise mark it pending, build once,
-# run the whole test command; a red test run is rerun once (a red build is not):
-#   pass → status success · fail then pass → success marked 偶发 · fail twice → status failure, job red.
-# issue-filer central: red opens a nightly-red issue (or comments on the open one) with the failing log tail and
-# the PRs merged since the last green full-suite; a flaky pass comments on the ci-health 全量偶发记录 issue.
-# issue-filer external (a reviewer agent files issues): status only. Any later trigger on that red commit (the
-# skip path) opens a nightly-red issue marked 未经评审 once the commit has been red for review-window minutes
-# with no nightly-red issue open, so the stub needs a trigger that fires after the window.
-# Either filer: a green run closes open nightly-red issues with 「已恢复」.
-# Release gate: when the tested commit is the default branch HEAD, its result is copied onto the open release PR
-# (scripts/project/release-gate-check.sh sync; release-gate.yml has the rest).
-# Outputs: result = skipped | green | flaky | red, sha = the commit tested.
-# Runner: the runner input only — never vars.CI_RUNNER, which routes PR CI. The runner needs bash and gh.
+# Reusable full suite: the central nightly flow. Project stubs give the commands and the runner; every judgement
+# lives here and in scripts/full-suite/full-suite.sh (its header).
+# Started only by workflow_dispatch (dots at 04:30 Taiwan time, the 「发版」 step): no schedule, because merging a PR
+# must never start a full run and a sleeping self-hosted runner (niko-mac) would only pile cron runs up.
+# A commit that already has a final full-suite status is not tested again, so a second trigger costs seconds.
+# issue-filer external: a reviewer agent files the nightly-red issue; the backstop step files one for a red it left
+# unfiled past review-window, on every run, because a red commit is rarely retriggered once the branch moves on.
+# Runner: the runner input only, never vars.CI_RUNNER (that routes PR CI). The runner needs bash and gh.
+# The token lives only on the helper steps: build and test never see it.
 #
 # Caller stub (project .github/workflows/full-suite.yml); the caller grants these permissions:
 #   name: Full suite
 #   on:
-#     schedule:
-#       - cron: "0 21 * * *"          # 05:00 Asia/Taipei
-#     workflow_dispatch:
+#     workflow_dispatch:              # dots at 04:30 Asia/Taipei; the 「发版」 step when main is untested
 #       inputs:
 #         ref: { description: "Branch, tag or sha (empty = default branch)", default: "" }
 #         force: { description: "Test even if this commit was tested", type: boolean, default: false }
@@ -71,7 +61,7 @@ on:
         type: string
         default: central
       review-window:
-        description: "external: minutes a red commit waits for a reviewed nightly-red issue before the backstop"
+        description: "external: minutes a red commit waits for a reviewed nightly-red issue before the backstop files one"
         type: number
         default: 120
       timeout-minutes:
@@ -98,7 +88,7 @@ jobs:
   full-suite:
     runs-on: ${{ fromJSON(inputs.runner) }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
-    # Two triggers for one ref (the reviewer agent and the cron backstop) queue; the second then skips.
+    # Two triggers for one ref (dots and the 「发版」 step) queue; the second then skips.
     concurrency:
       group: full-suite-${{ github.repository }}-${{ inputs.ref || 'default' }}
       cancel-in-progress: false
@@ -136,9 +126,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          FILER: ${{ inputs.issue-filer }}
-          WINDOW_MIN: ${{ inputs.review-window }}
           REF: ${{ inputs.ref }}
           FORCE: ${{ inputs.force }}
         run: |
@@ -153,7 +140,6 @@ jobs:
               if [ "$FORCE" != true ]; then
                 echo "skip=true" >> "$GITHUB_OUTPUT"
                 echo "Full suite skipped: $sha already tested (${seen})." >> "$GITHUB_STEP_SUMMARY"
-                "$FS" backstop
               fi ;;
           esac
       - name: Mark pending
@@ -162,8 +148,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          FILER: ${{ inputs.issue-filer }}
-          WINDOW_MIN: ${{ inputs.review-window }}
           SHA: ${{ steps.target.outputs.sha }}
         run: '"$RUNNER_TEMP/ci-kit/scripts/full-suite/full-suite.sh" mark pending "全量进行中"'
       - uses: actions/checkout@v4
@@ -211,7 +195,6 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           FILER: ${{ inputs.issue-filer }}
-          WINDOW_MIN: ${{ inputs.review-window }}
           SHA: ${{ steps.target.outputs.sha }}
           VERDICT: ${{ steps.run.outputs.verdict }}
         run: '"$RUNNER_TEMP/ci-kit/scripts/full-suite/full-suite.sh" report "$VERDICT"'
@@ -231,6 +214,16 @@ jobs:
           else
             echo "tested $SHA is not the $base HEAD: release gate left as it is"
           fi
+      # Tested or skipped, whichever commit: a default-branch red nobody filed within review-window gets its issue.
+      - name: Backstop
+        if: always() && inputs.issue-filer == 'external' && steps.target.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          FILER: ${{ inputs.issue-filer }}
+          WINDOW_MIN: ${{ inputs.review-window }}
+        run: '"$RUNNER_TEMP/ci-kit/scripts/full-suite/full-suite.sh" backstop'
       - name: Verdict
         id: verdict
         if: always()

@@ -27,7 +27,7 @@ gh workflow run full-suite.yml -R nokiy/infinite-canvas
 绿了不部署、不做别的：正式站只在「发版」时部署，测试站只给验收中的 PR。
 
 ## not_run_note
-全量现在跑在 GitHub 托管机器上，以后切到 Railway runner（`railway-runner-ic`）；排队超过等待时间就照写「没跑成」。
+全量跑在 Railway 执行机 `railway-runner-ic` 上；执行机离线、排队超过等待时间，就照写「没跑成」。
 
 ## test_name_hint
 单测失败形如 `FAIL tests/xxx.test.ts > <描述>`；文档站浏览器检查失败出在 `test-storybook`（`.storybook/check-stories.mjs`），带故事名

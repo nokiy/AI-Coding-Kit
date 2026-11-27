@@ -42,7 +42,9 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .ci-kit
           persist-credentials: false
-          sparse-checkout: scripts/project
+          sparse-checkout: |
+            scripts/project
+            scripts/full-suite
       - name: Kit — move out of workspace
         run: |
           rm -rf "$RUNNER_TEMP/ci-kit"

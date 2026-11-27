@@ -17,10 +17,15 @@ case "$args" in
   *"--body-file -"*) cat >> "$FX/calls" ;;
 esac
 case "$args" in
-  "api repos/"*"/statuses?"*'.state //'*) cat "$FX/state" 2>/dev/null ;;
-  "api repos/"*"/statuses?"*) cat "$FX/status" 2>/dev/null ;;
+  "api repos/"*"/statuses?"*)   # $FX/status-<sha> answers for that commit, $FX/status for any other
+    sha=${args#api repos/*/commits/}; sha=${sha%%/*}
+    if [ -f "$FX/status-$sha" ]; then cat "$FX/status-$sha"; else cat "$FX/status" 2>/dev/null; fi ;;
+  "api repos/o/r --jq .default_branch") echo main ;;
+  "api repos/"*"/commits?sha=main&"*) cat "$FX/recent" 2>/dev/null ;;
   "api repos/"*"/commits?sha="*) cat "$FX/commits" 2>/dev/null ;;
   "api repos/"*"/pulls"*) cat "$FX/pulls" 2>/dev/null ;;
+  "issue list"*"--label nightly-red"*"comments"*)   # $FX/names-<sha7>: the open issues naming that commit
+    for f in "$FX"/names-*; do [ -f "$f" ] || continue; case "$args" in *"${f##*/names-}"*) cat "$f" ;; esac; done ;;
   "issue list"*"--label nightly-red"*) cat "$FX/red" 2>/dev/null ;;
   "issue list"*"--label ci-health"*) cat "$FX/health" 2>/dev/null ;;
   "issue create"*) echo "https://github.com/o/r/issues/99" ;;
@@ -29,7 +34,7 @@ exit 0
 GH
 chmod +x "$T/bin/gh"
 # The caller's own helper variables (e.g. this test run inside a full-suite build) must not leak into the cases.
-unset BUILD_CMD TEST_CMD FILER WINDOW_MIN TAIL_LINES SUSPECT_DEPTH
+unset BUILD_CMD TEST_CMD FILER WINDOW_MIN TAIL_LINES SUSPECT_DEPTH BACKSTOP_DAYS
 export PATH="$T/bin:$PATH" FX="$T/fx" GH_REPO=o/r SHA=abc1234def RUN_URL=https://run/1 LOG_DIR="$T/logs"
 
 pass=0; fail=0; OUT="$T/out"; CODE=0
@@ -51,7 +56,9 @@ check() {
 }
 
 fresh; fs seen; check "no full-suite status reads as none" 0 'state=none age=0'
-fresh; echo "failure 130" > "$FX/status"; fs seen; check "a failure status reads with its age" 0 'state=failure age=130'
+fresh; echo "failure 130 https://run/0" > "$FX/status"; fs seen; check "a failure status reads with its age" 0 'state=failure age=130'
+fresh; echo "failure 130 https://run/0" > "$FX/status"; fs status abc1234def
+check "status prints state, age and run of one commit" 0 'failure 130 https://run/0'
 
 fresh; echo 5 > "$FX/red"; FILER=central fs report green
 check "green: success status, open nightly-red closed" 0 'state=success' 'description=全量通过' 'issue close 5' \
@@ -76,16 +83,29 @@ fresh; FILER=external fs report red
 check "red, external: status only" 0 'state=failure' '!issue create' '!issue comment'
 fresh; fs report purple; check "unknown verdict exits 2" 2 'verdict must be'
 
-fresh; echo "failure 130" > "$FX/status"; FILER=external WINDOW_MIN=120 fs backstop
-check "backstop: unreviewed red past the window opens 未经评审" 0 '未经评审' '--label nightly-red'
-fresh; echo "failure 30" > "$FX/status"; FILER=external WINDOW_MIN=120 fs backstop
-check "backstop: inside the window waits" 0 'waiting' '!issue create'
-fresh; echo "failure 130" > "$FX/status"; echo 3 > "$FX/red"; FILER=external fs backstop
-check "backstop: a reviewed red (issue open) is left alone" 0 'reviewed' '!issue create'
-fresh; echo "failure 130" > "$FX/status"; FILER=central fs backstop
+# backstop: every run, whichever commit it tested, walks the default branch's recent commits newest first.
+R1=r1aaaaaaaa; R2=r2bbbbbbbb; G1=g1cccccccc
+fresh; printf 'h0dddddddd\n%s\n' "$R1" > "$FX/recent"; echo "failure 130 https://run/r1" > "$FX/status-$R1"
+echo 'CURRENT-RUN-LOG' > "$T/logs/test-2.log"; FILER=external WINDOW_MIN=120 fs backstop
+check "backstop: an older red past the window, never retriggered, opens 未经评审 naming that commit and its run" 0 \
+  '未经评审' '--label nightly-red' "$R1" 'https://run/r1' '!https://run/1' '!CURRENT-RUN-LOG'
+fresh; echo "$R1" > "$FX/recent"; echo "failure 30 https://run/r1" > "$FX/status-$R1"; FILER=external WINDOW_MIN=120 fs backstop
+check "backstop: inside the window waits" 0 'waiting' '!issue create' '!issue comment'
+fresh; printf '%s\n%s\n' "$G1" "$R1" > "$FX/recent"; echo "success 10 https://run/g1" > "$FX/status-$G1"
+echo "failure 300 https://run/r1" > "$FX/status-$R1"; FILER=external fs backstop
+check "backstop: a later green means recovered, older reds are left alone" 0 '!issue create' '!issue comment'
+fresh; echo "$R1" > "$FX/recent"; echo "failure 300 https://run/r1" > "$FX/status-$R1"; echo 3 > "$FX/red"; echo 3 > "$FX/names-${R1:0:7}"
+FILER=external fs backstop
+check "backstop: a red an open nightly-red issue names is reviewed" 0 'reviewed' '!issue create' '!issue comment'
+fresh; echo "$R1" > "$FX/recent"; echo "failure 300 https://run/r1" > "$FX/status-$R1"; echo 3 > "$FX/red"
+FILER=external fs backstop
+check "backstop: an open issue naming another commit gets the 未经评审 comment (one open nightly-red per repo)" 0 \
+  'issue comment 3' '未经评审' "$R1" '!issue create'
+fresh; printf '%s\n%s\n' "$R2" "$R1" > "$FX/recent"; echo "failure 300 https://run/r2" > "$FX/status-$R2"
+echo "failure 400 https://run/r1" > "$FX/status-$R1"; echo 3 > "$FX/names-${R2:0:7}"; FILER=external fs backstop
+check "backstop: dedupe is per commit — a reviewed red does not cover an older unreviewed one" 0 '未经评审' "$R1" 'https://run/r1'
+fresh; echo "$R1" > "$FX/recent"; echo "failure 300 https://run/r1" > "$FX/status-$R1"; FILER=central fs backstop
 check "backstop: central filer never backstops" 0 '!issue create' '!statuses?'
-fresh; echo "success 300" > "$FX/status"; FILER=external fs backstop
-check "backstop: green commit opens nothing" 0 '!issue create'
 
 ONCE="$T/once"
 fresh; BUILD_CMD="echo built" TEST_CMD="echo tests ok" fs run
