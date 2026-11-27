@@ -150,10 +150,12 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           SHA: ${{ steps.target.outputs.sha }}
         run: '"$RUNNER_TEMP/ci-kit/scripts/full-suite/full-suite.sh" mark pending "全量进行中"'
+      # No token in .git/config: build and test run the project's own code. Later steps reach GitHub via gh + GH_TOKEN.
       - uses: actions/checkout@v4
         if: steps.target.outputs.skip != 'true'
         with:
           ref: ${{ steps.target.outputs.sha }}
+          persist-credentials: false
       - name: Private deps — credentials
         if: steps.target.outputs.skip != 'true' && inputs.private-deps != ''
         env:
