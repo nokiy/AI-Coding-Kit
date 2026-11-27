@@ -103,12 +103,7 @@ jobs:
     outputs:
       result: ${{ steps.verdict.outputs.result }}
       sha: ${{ steps.target.outputs.sha }}
-    env:
-      GH_TOKEN: ${{ github.token }}
-      GH_REPO: ${{ github.repository }}
-      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      FILER: ${{ inputs.issue-filer }}
-      WINDOW_MIN: ${{ inputs.review-window }}
+    # The token and the helper's variables live only on the helper steps: build and test never see them.
     steps:
       # The kit at this workflow's own commit, moved out of the workspace (same pattern as quality.yml).
       - name: Kit — locate
@@ -121,7 +116,6 @@ jobs:
             exit 1
           fi
           echo "kit from ${KIT_REPO}@${KIT_SHA}"
-          echo "FS=$RUNNER_TEMP/ci-kit/scripts/full-suite/full-suite.sh" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
         with:
           repository: ${{ job.workflow_repository }}
@@ -136,14 +130,18 @@ jobs:
       - name: Tested already?
         id: target
         env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          FILER: ${{ inputs.issue-filer }}
+          WINDOW_MIN: ${{ inputs.review-window }}
           REF: ${{ inputs.ref }}
           FORCE: ${{ inputs.force }}
         run: |
           [ -n "$REF" ] || REF=$(gh api "repos/$GH_REPO" --jq .default_branch)
           sha=$(gh api "repos/$GH_REPO/commits/$REF" --jq .sha)
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          echo "SHA=$sha" >> "$GITHUB_ENV"
-          export SHA=$sha
+          export SHA=$sha FS="$RUNNER_TEMP/ci-kit/scripts/full-suite/full-suite.sh"
           seen=$("$FS" seen)
           echo "$REF → $sha · $seen"
           case "$seen" in
@@ -156,7 +154,14 @@ jobs:
           esac
       - name: Mark pending
         if: steps.target.outputs.skip != 'true'
-        run: '"$FS" mark pending "全量进行中"'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          FILER: ${{ inputs.issue-filer }}
+          WINDOW_MIN: ${{ inputs.review-window }}
+          SHA: ${{ steps.target.outputs.sha }}
+        run: '"$RUNNER_TEMP/ci-kit/scripts/full-suite/full-suite.sh" mark pending "全量进行中"'
       - uses: actions/checkout@v4
         if: steps.target.outputs.skip != 'true'
         with:
@@ -193,18 +198,25 @@ jobs:
           BUILD_CMD: ${{ inputs.build }}
           TEST_CMD: ${{ inputs.test }}
         run: |
-          "$FS" run | tee "$RUNNER_TEMP/full-suite-run.out"
+          "$RUNNER_TEMP/ci-kit/scripts/full-suite/full-suite.sh" run | tee "$RUNNER_TEMP/full-suite-run.out"
           grep '^verdict=' "$RUNNER_TEMP/full-suite-run.out" | tail -n1 >> "$GITHUB_OUTPUT"
       - name: Status and issues
         if: steps.run.outputs.verdict != ''
         env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          FILER: ${{ inputs.issue-filer }}
+          WINDOW_MIN: ${{ inputs.review-window }}
+          SHA: ${{ steps.target.outputs.sha }}
           VERDICT: ${{ steps.run.outputs.verdict }}
-        run: '"$FS" report "$VERDICT"'
+        run: '"$RUNNER_TEMP/ci-kit/scripts/full-suite/full-suite.sh" report "$VERDICT"'
       - name: Verdict
         id: verdict
         if: always()
         env:
           SKIP: ${{ steps.target.outputs.skip }}
+          SHA: ${{ steps.target.outputs.sha }}
           VERDICT: ${{ steps.run.outputs.verdict }}
         run: |
           result=${VERDICT:-none}
