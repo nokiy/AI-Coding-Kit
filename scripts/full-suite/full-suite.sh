@@ -3,6 +3,7 @@
 # status, report and suspects also SHA (or the commit as argument).
 # Commands: seen · status <sha> · mark <state> <desc> · run · report <green|flaky|red> · backstop · suspects
 # One open nightly-red issue per repo, at most: a later red comments on it, so the morning repair reads one place.
+# Only a pass on the default branch HEAD closes it: a test-branch or older-commit green says nothing about main.
 # A failed build is not rerun (a build is not flaky); a failed test command is rerun once, whole.
 # backstop runs on every trigger (FILER=external): a reviewer that never came must not leave a red unfiled, and the
 # red commit is rarely retriggered once the default branch moves on.
@@ -111,8 +112,16 @@ file_flaky() {
   else gh issue create -R "$GH_REPO" --title "$FLAKY_TITLE" --label "$HEALTH" --body "$body"; fi
 }
 
+on_default_head() { # SHA is the default branch HEAD (a failed lookup counts as no)
+  local base head
+  base=$(api "repos/$GH_REPO" --jq .default_branch) || return 1
+  head=$(api "repos/$GH_REPO/commits/$base" --jq .sha) || return 1
+  [ -n "$head" ] && [ "$head" = "$SHA" ]
+}
+
 close_red() {
   local n
+  on_default_head || { echo "tested ${SHA:0:7} is not the default branch HEAD: nightly-red issues left open"; return 0; }
   for n in $(open_issues "$RED"); do
     gh issue close "$n" -R "$GH_REPO" --comment "已恢复：全量在 $SHA 上通过（${RUN_URL:-}）。" >/dev/null \
       && echo "closed #$n"

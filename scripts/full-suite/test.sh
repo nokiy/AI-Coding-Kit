@@ -21,6 +21,7 @@ case "$args" in
     sha=${args#api repos/*/commits/}; sha=${sha%%/*}
     if [ -f "$FX/status-$sha" ]; then cat "$FX/status-$sha"; else cat "$FX/status" 2>/dev/null; fi ;;
   "api repos/o/r --jq .default_branch") echo main ;;
+  "api repos/o/r/commits/main --jq .sha") cat "$FX/head" 2>/dev/null ;;   # the default branch HEAD
   "api repos/"*"/commits?sha=main&"*) cat "$FX/recent" 2>/dev/null ;;
   "api repos/"*"/commits?sha="*) cat "$FX/commits" 2>/dev/null ;;
   "api repos/"*"/pulls"*) cat "$FX/pulls" 2>/dev/null ;;
@@ -60,9 +61,18 @@ fresh; echo "failure 130 https://run/0" > "$FX/status"; fs seen; check "a failur
 fresh; echo "failure 130 https://run/0" > "$FX/status"; fs status abc1234def
 check "status prints state, age and run of one commit" 0 'failure 130 https://run/0'
 
+fresh; echo 5 > "$FX/red"; echo "$SHA" > "$FX/head"; FILER=central fs report green
+check "green on the default branch HEAD: success status, open nightly-red closed" 0 'state=success' \
+  'description=全量通过' 'issue close 5' '已恢复' '!issue create'
+fresh; echo 5 > "$FX/red"; echo "$SHA" > "$FX/head"; FILER=external fs report flaky
+check "flaky on the default branch HEAD: open nightly-red closed" 0 'issue close 5'
+fresh; echo 5 > "$FX/red"; echo f00dbeef99 > "$FX/head"; FILER=central fs report green
+check "green on another commit (test branch, older sha): status written, nightly-red left open" 0 'state=success' \
+  'not the default branch HEAD' '!issue close' '!已恢复'
+fresh; echo 5 > "$FX/red"; echo f00dbeef99 > "$FX/head"; FILER=external fs report flaky
+check "flaky on another commit: nightly-red left open" 0 'state=success' '!issue close'
 fresh; echo 5 > "$FX/red"; FILER=central fs report green
-check "green: success status, open nightly-red closed" 0 'state=success' 'description=全量通过' 'issue close 5' \
-  '已恢复' '!issue create'
+check "green, default branch HEAD unknown: nightly-red left open" 0 'state=success' '!issue close'
 
 fresh; FILER=central fs report flaky
 check "flaky, central: success marked flaky, ci-health opened" 0 'state=success' '偶发' \
@@ -81,6 +91,14 @@ fresh; echo 7 > "$FX/red"; FILER=central fs report red
 check "red, central: open nightly-red gets a comment, no second issue" 0 'issue comment 7' '!issue create'
 fresh; FILER=external fs report red
 check "red, external: status only" 0 'state=failure' '!issue create' '!issue comment'
+fresh; FILER=external WINDOW_MIN=1 fs report red
+check "red, external: the message names the review window it was given" 0 'after 1 min' '!120 min'
+# The workflow must hand review-window to the report step too, or the red message falls back to 120.
+WF="$HERE/../../.github/workflows/full-suite.yml"
+awk '/- name: Status and issues/{on=1; next} on && /- name:/{exit} on' "$WF" > "$OUT"; CODE=0
+# shellcheck disable=SC2016 # the literal workflow expression is the pattern
+check "full-suite.yml: Status and issues step gets WINDOW_MIN from review-window" 0 \
+  'WINDOW_MIN: ${{ inputs.review-window }}'
 fresh; fs report purple; check "unknown verdict exits 2" 2 'verdict must be'
 
 # backstop: every run, whichever commit it tested, walks the default branch's recent commits newest first.
