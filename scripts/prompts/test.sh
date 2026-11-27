@@ -76,10 +76,10 @@ done
 "$SH" "$HERE/render-all.sh" "$T/rendered" 2> "$T/e"; c=$?
 if [ "$c" = 0 ] && diff -r "$T/rendered" "$P/rendered" > "$T/d"; then ok "prompts/rendered/ = fresh render-all.sh output"
 else no "prompts/rendered/ = fresh render-all.sh output" "exit $c; run scripts/prompts/render-all.sh: $(head -n3 "$T/d" | tr '\n' ' ')"; fi
-m="$P/rendered/infinite-canvas-morning-local.md"
+m="$P/rendered/infinite-canvas-morning-cloud.md"
 if [ -s "$m" ] && ! grep -Eq 'gh pr merge|/merge|-X PUT|push --force|push -f|--force-with-lease|/reviews' "$m"; then
-  ok "row 3: infinite-canvas local morning never merges or force-pushes"
-else no "row 3: infinite-canvas local morning never merges or force-pushes"; fi
+  ok "row 3: infinite-canvas cloud morning never merges or force-pushes"
+else no "row 3: infinite-canvas cloud morning never merges or force-pushes"; fi
 
 # --- row 3: permissions ---
 forbid_night='gh pr merge|gh pr close|gh pr review|gh run rerun|gh issue close|gh issue delete'

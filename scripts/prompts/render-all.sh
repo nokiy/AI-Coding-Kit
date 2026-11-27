@@ -21,6 +21,6 @@ r quota-bar-nightly.md "$P/projects/quota-bar.md" "$P/nightly.md"
 r quota-bar-morning.md "$P/projects/quota-bar.md" "$P/morning.md"
 r infinite-canvas-nightly.md "$P/projects/infinite-canvas.md" "$P/nightly.md"
 r infinite-canvas-morning.md "$P/projects/infinite-canvas.md" "$P/morning.md"
-r infinite-canvas-morning-local.md "$P/projects/infinite-canvas.md" "$P/projects/variants/infinite-canvas-local.md" "$P/morning.md"
+r infinite-canvas-morning-cloud.md "$P/projects/infinite-canvas.md" "$P/projects/variants/infinite-canvas-cloud.md" "$P/morning.md"
 
 exit $bad
