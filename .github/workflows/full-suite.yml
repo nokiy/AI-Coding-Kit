@@ -11,6 +11,8 @@
 # skip path) opens a nightly-red issue marked 未经评审 once the commit has been red for review-window minutes
 # with no nightly-red issue open, so the stub needs a trigger that fires after the window.
 # Either filer: a green run closes open nightly-red issues with 「已恢复」.
+# Release gate: when the tested commit is the default branch HEAD, its result is copied onto the open release PR
+# (scripts/project/release-gate-check.sh sync; release-gate.yml has the rest).
 # Outputs: result = skipped | green | flaky | red, sha = the commit tested.
 # Runner: the runner input only — never vars.CI_RUNNER, which routes PR CI. The runner needs bash and gh.
 #
@@ -122,7 +124,9 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .ci-kit
           persist-credentials: false
-          sparse-checkout: scripts/full-suite
+          sparse-checkout: |
+            scripts/full-suite
+            scripts/project
       - name: Kit — move out of workspace
         run: |
           rm -rf "$RUNNER_TEMP/ci-kit"
@@ -211,6 +215,22 @@ jobs:
           SHA: ${{ steps.target.outputs.sha }}
           VERDICT: ${{ steps.run.outputs.verdict }}
         run: '"$RUNNER_TEMP/ci-kit/scripts/full-suite/full-suite.sh" report "$VERDICT"'
+      # Release gate (release-gate.yml): a fresh result on the default branch HEAD is copied onto the open release PR.
+      # Never fails the job: the verdict below stays the full-suite result.
+      - name: Release gate
+        if: steps.run.outputs.verdict != ''
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          base=$(gh api "repos/$GH_REPO" --jq .default_branch)
+          if [ "$(gh api "repos/$GH_REPO/commits/$base" --jq .sha)" = "$SHA" ]; then
+            BRANCH=$base "$RUNNER_TEMP/ci-kit/scripts/project/release-gate-check.sh" sync
+          else
+            echo "tested $SHA is not the $base HEAD: release gate left as it is"
+          fi
       - name: Verdict
         id: verdict
         if: always()
