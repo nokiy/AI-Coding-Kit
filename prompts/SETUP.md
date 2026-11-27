@@ -8,8 +8,8 @@
 | dots | quota-bar | `quota-bar-nightly.md` | 每天 04:30 |
 | dots | AI 画板 | `infinite-canvas-nightly.md` | 每天 04:30 |
 | Claude Desktop 本机定时任务 | quota-bar | `quota-bar-morning.md` | 每天 09:00 |
-| Claude Code 云端定时任务（默认） | AI 画板 | `infinite-canvas-morning.md` | 每天 07:30 |
-| Claude Desktop 本机定时任务（备选） | AI 画板 | `infinite-canvas-morning-local.md` | 每天 09:00 |
+| Claude Desktop 本机定时任务（默认） | AI 画板 | `infinite-canvas-morning.md` | 每天 09:00 |
+| Claude Code 云端定时任务（备选） | AI 画板 | `infinite-canvas-morning-cloud.md` | 每天 07:30 |
 
 不设 GitHub 定时：全量只由 dots 触发（「发版」时发版门也可能补跑一次）。
 
@@ -32,19 +32,21 @@
 7. 详情页点一次 **Run now**，打开那次会话，遇到权限提示一律选 always allow。没有 `nightly-red` 时它只巡检观察项；第一次真修（验收行 4 注入失败那次）会再问到 `git worktree`、`git push`、`swift-test.sh`、`await-beta.sh`，同样 always allow。
 8. 只在 Desktop 开着、Mac 醒着时跑；睡过了点，醒来补跑一次（提示词已说明补跑照常做）。可在 **Settings → Desktop app** 打开 **Keep computer awake**。
 
-## 3. AI 画板早晨修复：云端定时任务（默认）
+## 3. AI 画板早晨修复：Claude Desktop 本机定时任务（默认）
+
+照第 2 节建，只换这几处：**Name** `infinite-canvas-morning-repair`；指令框整份贴 `infinite-canvas-morning.md`；**Local folder** 选 `/Users/niko/AI_Workspace/AI_Coding/Learn/infinite-canvas`；每天 09:00。第一次真修会问到 `git worktree`、`git push`、`scripts/acceptance.sh`，一律 always allow。
+
+### 备选：AI 画板改用云端定时任务
+
+本机跑不了（如 Mac 常年不开）时：按下面建云端任务，贴 `infinite-canvas-morning-cloud.md`，然后把本机那个任务暂停。
 
 1. 在终端的 Claude Code 里跑一次 `/web-setup`，让 claude.ai 账号能克隆 `nokiy/infinite-canvas`。
 2. 打开 https://claude.ai/code/routines → **New task**（或 **New routine**）→ 选 **Set up manually**。
-3. 名字 `infinite-canvas-morning-repair`；提示词整份贴 `infinite-canvas-morning.md`。
+3. 名字 `infinite-canvas-morning-repair`；提示词整份贴 `infinite-canvas-morning-cloud.md`。
 4. **Trigger**：**Schedule**，每天 07:30（按本地时间填）。
 5. **Repository**：`nokiy/infinite-canvas`。**Cloud environment**：**Default**（Limited，勾着 **Allow package managers**）。
 6. **Create**，详情页点一次 **Run now**，看会话里有没有卡在权限或网络上（云端默认 auto mode）。
 7. 也可以在 AI 画板检出里的 Claude Code 会话跑 `/schedule`，按问答填同样的仓库、时间和提示词。
-
-### 备选：AI 画板也用本机
-
-云端装不上依赖或跑不通时：照第 2 节建 `infinite-canvas-morning-repair`，贴 `infinite-canvas-morning-local.md`，文件夹选 `/Users/niko/AI_Workspace/AI_Coding/Learn/infinite-canvas`，每天 09:00，然后把云端那个任务的 **Status** 切到 Paused。
 
 ## 4. 之后要观察的（Kit#32 验收行）
 
